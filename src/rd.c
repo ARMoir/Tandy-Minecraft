@@ -301,6 +301,11 @@ void rd_player_pos(int id, float *x, float *y, float *z) {
     *z = players[id].z;
 }
 
+void rd_player_angles(int id, float *yaw, float *pitch) {
+    *yaw = players[id].yaw;
+    *pitch = players[id].pitch;
+}
+
 typedef struct { float x0, y0, z0, x1, y1, z1; } box;
 
 static box player_box(const player *p) {

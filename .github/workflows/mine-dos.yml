@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          wcl -bcl=dos -0 -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c src/rd.c
+          wcl -bcl=dos -0 -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c src/rd.c src/rd_fast.c
           test -s MINE.EXE
           python3 - <<'PY'
           from pathlib import Path
@@ -42,6 +42,12 @@ jobs:
           cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=2 -o test-snapshot tools/snapshot.c src/rd.c
           ./test-snapshot snapshot.ppm 1 5 40 25
           test -s snapshot.ppm
+      - name: Validate fast integer voxel renderer on a host
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-fast tools/test_fast.c src/rd.c src/rd_fast.c
+          ./test-fast
       - name: Upload DOS build
         uses: actions/upload-artifact@v4
         with:

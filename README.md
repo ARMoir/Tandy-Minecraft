@@ -169,3 +169,10 @@ The first port retains the original voxel logic and software-floating-point
 renderer, using an initial 32x24x32 world and Tandy BIOS mode 08h (160x200x16).
 Actual NEC V20 hardware speed still needs measurement. The remaining platforms
 and their tests are unchanged.
+
+
+### Tandy V20 renderer update
+The DOS build uses an optimized, DOS-only fixed-point voxel ray marcher
+(`src/rd_fast.c`), retaining the original rdgeneric world/physics and modern
+platform renderer. The Tandy mode immediately displays a color pattern while
+entering gameplay. Switch quality with H or start with `MINE.EXE /LOW`.

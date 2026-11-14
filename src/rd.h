@@ -89,6 +89,7 @@ void rd_relight(void); /* call after writing into rd_blocks() directly */
 
 int rd_selected(int id);
 void rd_player_pos(int id, float *x, float *y, float *z);
+void rd_player_angles(int id, float *yaw, float *pitch);
 void rd_player_set(int id, float x, float y, float z, float yaw, float pitch);
 
 #endif

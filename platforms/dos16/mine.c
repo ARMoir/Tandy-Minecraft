@@ -1,6 +1,6 @@
 /* MINE.EXE - 8086/V20, real-mode DOS, Tandy 1000 160x200x16.
  * Uses the original rdgeneric engine; hardware-specific code lives here.
- * /HI = 80x50 internal raycast (default 40x25), /BENCH = eight frames.
+ * /LOW = 20x25, default = 40x25, /HI = 80x50; /BENCH = eight frames.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +8,7 @@
 #include <dos.h>
 #include <conio.h>
 #include "../../src/rd.h"
+#include "../../src/rd_fast.h"
 
 #define SCREEN_WIDTH_BYTES 80
 #define RENDER_MAX_W 80
@@ -15,34 +16,11 @@
 #define BENCH_FRAMES 8
 
 /* All arrays are under 64KB each for Open Watcom's large memory model. */
-static rd_u32 rgb[RENDER_MAX_W * RENDER_MAX_H];
+static rd_u8 indexed[RENDER_MAX_W * RENDER_MAX_H];
 static rd_u8 packed[SCREEN_WIDTH_BYTES * RENDER_MAX_H];
 static volatile rd_u8 keys[128];
 static rd_u8 previous[128];
 static void (__interrupt __far *previous_irq1)(void);
-
-static int absi(int x) { return x < 0 ? -x : x; }
-
-/* Approximate RGB to the standard Tandy/PCjr 16-color palette.
- * Done only once per render pixel, not once per scaled display pixel.
- */
-static rd_u8 nearest_tandy(rd_u32 rgbval) {
-    static const rd_u8 palette[16][3] = {
-        {0,0,0},{0,0,170},{0,170,0},{0,170,170},
-        {170,0,0},{170,0,170},{170,85,0},{170,170,170},
-        {85,85,85},{85,85,255},{85,255,85},{85,255,255},
-        {255,85,85},{255,85,255},{255,255,85},{255,255,255}
-    };
-    int r=(int)((rgbval>>16)&255UL);
-    int g=(int)((rgbval>>8)&255UL);
-    int b=(int)(rgbval&255UL);
-    int i, best=0, best_error=10000;
-    for(i=0;i<16;i++) {
-        int error=absi(r-palette[i][0])+absi(g-palette[i][1])+absi(b-palette[i][2]);
-        if(error<best_error) {best_error=error;best=i;}
-    }
-    return (rd_u8)best;
-}
 
 static void mode_set(unsigned mode) {
     union REGS r;
@@ -57,10 +35,19 @@ static unsigned mode_get(void) {
     return r.h.al;
 }
 
-/* BIOS graphics mode 08h: 160x200 16-color, two 8KB interleaved banks.
- * Each byte is two four-bit pixels, rows split at B800:0000/2000.
- * BIOS initializes the graphics-page mapping on the Tandy 1000.
+/* Show a test pattern immediately, before the first ray is traced.
+ * If the user sees this, the Tandy BIOS mode switch and B800 write worked.
  */
+static void draw_startup(void) {
+    rd_u8 __far *video=(rd_u8 __far *)MK_FP(0xB800,0);
+    int y,x;
+    for(y=0;y<200;y++) {
+        unsigned base=(unsigned)((y&1)?0x2000:0)+((unsigned)y/2)*80U;
+        rd_u8 c=(rd_u8)(y<30?0x11:(y<50?0x33:(y<65?0xAA:0x00)));
+        for(x=0;x<80;x++) video[base+(unsigned)x]=c;
+    }
+}
+/* Tandy BIOS mode 08h: 160x200x16, B800:0000/2000 interleave. */
 static void render_screen(int w,int h) {
     rd_u8 __far *video=(rd_u8 __far *)MK_FP(0xB800,0);
     int sx,sy,byte_x,y;
@@ -72,7 +59,7 @@ static void render_screen(int w,int h) {
         for(byte_x=0;byte_x<SCREEN_WIDTH_BYTES;byte_x++) {
             sx=byte_x/replicate;
             {
-                rd_u8 ink=nearest_tandy(rgb[pixrow+(unsigned)sx]);
+                rd_u8 ink=indexed[pixrow+(unsigned)sx]&15;
                 packed[row+(unsigned)byte_x]=(rd_u8)((ink<<4)|ink);
             }
         }
@@ -84,7 +71,6 @@ static void render_screen(int w,int h) {
             video[base+(unsigned)byte_x]=packed[src+(unsigned)byte_x];
     }
 }
-
 /* Read make/break scan codes, including keys held across rendered frames.
  * We own IRQ1 only during play and restore the BIOS handler before exit.
  * The original IBM XT keyboard acknowledge and PIC EOI are required.
@@ -140,18 +126,19 @@ static void save_world(void) {
 }
 
 int main(int argc,char **argv) {
-    int hi=0,bench=0,player,frames=0,i,steps;
+    int quality=1,bench=0,player,frames=0,i,steps;
     unsigned previous_mode;
     unsigned long began,last,now,elapsed,fps10;
     rd_input in;
     for(i=1;i<argc;i++) {
-        if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) hi=1;
+        if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) quality=2;
+        if(!strcmp(argv[i],"/LOW") || !strcmp(argv[i],"/low")) quality=0;
         if(!strcmp(argv[i],"/BENCH") || !strcmp(argv[i],"/bench")) bench=1;
     }
     printf("MINE - Minecraft for Tandy 1000 EX / V20\n");
     printf("World: 32x24x32, video: Tandy 160x200 16 colors.\n");
     printf("WASD move, arrows look, SPACE jump, F dig, E place, 1-7 blocks, R reset.\n");
-    printf("ESC/Q exit, H toggle detail. World saved as MINE.WLD on exit.\n");
+    printf("ESC/Q exit, H changes detail, /LOW starts fast. Saves MINE.WLD.\n");
     rd_init(132211UL,RD_HILLS);
     player=rd_player_add();
     if(player<0) {puts("No free player slot.");return 1;}
@@ -164,22 +151,24 @@ int main(int argc,char **argv) {
         puts("Tandy/PCjr BIOS mode 08h unavailable. MINE requires Tandy graphics.");
         return 1;
     }
+    draw_startup();
     previous_irq1=_dos_getvect(0x09);
     _dos_setvect(0x09,mine_irq1);
     began=last=timer_ticks();
     while(!keys[0x01] && !keys[0x10]) { /* ESC or Q */
-        int w=hi?80:40, h=hi?50:25;
+        int w=quality==2?80:(quality==1?40:20);
+        int h=quality==2?50:25;
         now=timer_ticks();
         elapsed=now-last;
         last=now;
         steps=(int)(elapsed*60UL/18UL);
         if(steps<1) steps=1;
         if(steps>12) steps=12;
-        if(pressed(0x23)) hi=!hi; /* H */
+        if(pressed(0x23)) quality=(quality+1)%3; /* H */
         read_controls(&in);
         rd_player_input(player,&in);
         for(i=0;i<steps;i++) rd_tick();
-        rd_render(player,rgb,w,h,w);
+        rd_fast_render(player,indexed,w,h);
         render_screen(w,h);
         frames++;
         if(bench && frames>=BENCH_FRAMES) break;
