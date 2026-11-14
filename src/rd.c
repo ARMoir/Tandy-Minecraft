@@ -1,5 +1,20 @@
 /* rdgeneric core. See rd.h. Freestanding: no includes beyond rd.h. */
 #include "rd.h"
+#ifdef RD_DOS16
+#include "rd_world_rle.h"
+/* Prebuilt terrain from the original procedural generator. O(block count)
+ * decode instead of thousands of 32-bit hashes/divides on a 7 MHz V20.
+ */
+static void unpack_default_world(rd_u8 *blocks_out) {
+    unsigned i=0,pos=0;
+    while(i<RD_WORLD_RLE_BYTES && pos<(unsigned)(RD_X*RD_Y*RD_Z)) {
+        unsigned count=(unsigned)rd_world_rle[i++];
+        rd_u8 block=rd_world_rle[i++];
+        while(count-- && pos<(unsigned)(RD_X*RD_Y*RD_Z))
+            blocks_out[pos++]=block;
+    }
+}
+#endif
 
 #define PI 3.14159265f
 #define EYE 1.62f
@@ -252,10 +267,14 @@ static void respawn(player *p) {
 void rd_init(rd_u32 seed, int style) {
     world_seed = seed;
     rng_state = seed ? seed : 1;
-#ifndef RD_DOS16
+#ifdef RD_DOS16
+    (void)style;
+    unpack_default_world(blocks);
+    rd_relight();
+#else
     make_textures();
-#endif
     generate(style);
+#endif
     for (int i = 0; i < RD_MAX_PLAYERS; i++) players[i].active = 0;
 }
 

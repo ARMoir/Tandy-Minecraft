@@ -22,6 +22,15 @@ jobs:
         with:
           version: '2.0'
           target: dos
+      - name: Precompute compressed default Minecraft world on build host
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o worldgen tools/make_default_world.c src/rd.c
+          ./worldgen src/rd_world_rle.h
+          test -s src/rd_world_rle.h
+          cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-world tools/test_world.c src/rd.c
+          ./test-world
       - name: Generate original block textures in Tandy palette on host
         shell: bash
         run: |

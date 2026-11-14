@@ -54,3 +54,8 @@ An up-to-date Linux/Windows host with C99 compiler and Open Watcom 2:
 
 See .github/workflows/mine-dos.yml for the canonical automated build.
 The original rdgeneric platforms are preserved. License: see LICENSE.
+
+Startup improvement: the 32x24x32 default world is procedurally generated
+on the CI host, run-length compressed and EMBEDDED inside MINE.EXE.
+No external data file is required. Saves in MINE.WLD override the default
+world during normal play. /BENCH always uses the embedded world.
