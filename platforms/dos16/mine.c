@@ -9,6 +9,7 @@
 #include <conio.h>
 #include "../../src/rd.h"
 #include "../../src/rd_fast.h"
+#include "mine_keys.h"
 
 #define SCREEN_WIDTH_BYTES 80
 #define RENDER_MAX_W 80
@@ -18,8 +19,8 @@
 /* All arrays are under 64KB each for Open Watcom's large memory model. */
 static rd_u8 indexed[RENDER_MAX_W * RENDER_MAX_H];
 static rd_u8 packed[SCREEN_WIDTH_BYTES * RENDER_MAX_H];
-static volatile rd_u8 keys[128];
-static volatile rd_u8 edges[128]; /* preserve brief presses between slow frames */
+static mine_keyboard keyboard;
+static mine_snapshot snapshot;
 static void (__interrupt __far *previous_irq1)(void);
 
 static void mode_set(unsigned mode) {
@@ -79,25 +80,9 @@ static void __interrupt __far mine_irq1(void) {
     unsigned char ctrl=(unsigned char)inp(0x61);
     outp(0x61,ctrl|0x80);
     outp(0x61,ctrl);
-    if(sc!=0xE0 && sc!=0xE1) {
-        unsigned code=sc&0x7F;
-        if(sc&0x80) keys[code]=0;
-        else {
-            if(!keys[code]) edges[code]=1;
-            keys[code]=1;
-        }
-    }
+    mine_key_feed(&keyboard,sc);
     outp(0x20,0x20);
 }
-static int pressed(int scan) {
-    return edges[scan]!=0;
-}
-static void capture_keys(void) {
-    int i;
-    /* Clear one-shot makes only after all keys were processed this frame. */
-    for(i=0;i<128;i++) edges[i]=0;
-}
-
 static unsigned long timer_ticks(void) {
     union REGS r;
     r.h.ah=0;
@@ -109,34 +94,31 @@ static unsigned long timer_ticks(void) {
  * Key bar layout: W A S D Left Right Up Down, in that order.
  */
 static void keytest_bars(void) {
-    static const int scan[8]={0x11,0x1E,0x1F,0x20,0x4B,0x4D,0x48,0x50};
+    /* Eight rows from top to bottom:
+     * W A S D LEFT RIGHT UP DOWN. Draw directly in the two interlaced
+     * Tandy banks; don't accidentally alternate at the wrong offset.
+     */
+    static const unsigned char scan[8]={0x11,0x1E,0x1F,0x20,0x4B,0x4D,0x48,0x50};
     rd_u8 __far *even=(rd_u8 __far *)MK_FP(0xB800,0);
     rd_u8 __far *odd=(rd_u8 __far *)MK_FP(0xBA00,0);
-    int bar,y,j;
-    for(bar=0;bar<8;bar++){
-        rd_u8 color=keys[scan[bar]]?0xAA:(edges[scan[bar]]?0xDD:0x11);
-        for(y=0;y<10;y++){
-            unsigned offset=(unsigned)(bar*12+y)*80U;
-            rd_u8 __far *dst=y&1?odd:even; /* diagnostic only, two banks */
-            for(j=0;j<42;j++)dst[offset+(unsigned)j]=color;
+    int bar,y,x;
+    for(bar=0;bar<8;bar++) {
+        rd_u8 color=keyboard.down[scan[bar]]?0xAA:
+                    (keyboard.edge[scan[bar]]?0xDD:0x11);
+        for(y=6+bar*23;y<21+bar*23;y++){
+            unsigned off=((unsigned)y/2)*80U;
+            rd_u8 __far *bank=(y&1)?odd:even;
+            for(x=8;x<72;x++)bank[off+(unsigned)x]=color;
         }
     }
 }
-static void read_controls(rd_input *in) {
-    int i;
-    memset(in,0,sizeof(*in));
-    in->forward=((keys[0x11]||edges[0x11])?1.0f:0.0f)-((keys[0x1F]||edges[0x1F])?1.0f:0.0f);
-    in->strafe=((keys[0x20]||edges[0x20])?1.0f:0.0f)-((keys[0x1E]||edges[0x1E])?1.0f:0.0f);
-    in->jump=keys[0x39]!=0 || edges[0x39]!=0;
-    /* Look speeds are scaled in the main loop to real elapsed BIOS ticks.
-     * IRQ key edges also count, even if released during the last render.
+static void sample_keys(void) {
+    /* Snapshot + consume at the START of a frame, not the end. Any IRQ
+     * arrivals during rendering survive for the next frame.
      */
-    in->yaw=(((keys[0x4D]||edges[0x4D])?1.0f:0.0f)-((keys[0x4B]||edges[0x4B])?1.0f:0.0f))*0.06f;
-    in->pitch=(((keys[0x48]||edges[0x48])?1.0f:0.0f)-((keys[0x50]||edges[0x50])?1.0f:0.0f))*0.04f;
-    in->dig=pressed(0x21); /* F */
-    in->place=pressed(0x12); /* E */
-    in->reset=pressed(0x13); /* R */
-    for(i=0;i<7;i++) if(pressed(0x02+i)) in->select=i+1;
+    _disable();
+    mine_key_snapshot(&keyboard,&snapshot);
+    _enable();
 }
 static void load_world(void) {
     FILE *f=fopen("MINE.WLD","rb");
@@ -158,6 +140,7 @@ int main(int argc,char **argv) {
     unsigned long began,last,now,elapsed,fps10,auto_since,setup_start,setup_ticks;
     unsigned long render_ticks=0,video_ticks=0,measured;
     rd_input in;
+    mine_commands commands;
     for(i=1;i<argc;i++) {
         if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) {quality=3;auto_quality=0;}
         if(!strcmp(argv[i],"/LOW") || !strcmp(argv[i],"/low")) {quality=0;auto_quality=0;}
@@ -172,9 +155,10 @@ int main(int argc,char **argv) {
     }
     printf("MINE - Minecraft for Tandy 1000 EX / V20\n");
     printf("World: 32x24x32, video: Tandy 160x200 16 colors.\n");
-    printf("WASD move, arrows look, SPACE jump, F dig, E place, 1-7 blocks, R reset.\n");
+    printf("WASD move, arrows LEFT/RIGHT turn UP/DOWN look, SPACE jump.\n");
+    printf("F dig, E place, 1-7 blocks, R reset view, H detail, ESC/Q exit.\n");
     printf("ESC/Q quit, H detail, /MID 40x40, /DETAIL 40x50, /KEYTEST.\n");
-    if(keytest) puts("KEYTEST: W A S D, then arrow keys. Green bars = held. ESC exits.");
+    if(keytest) puts("KEYTEST rows: W A S D LEFT RIGHT UP DOWN. Green=held, pink=tapped.");
     setup_start=timer_ticks();
     puts("Loading embedded Minecraft world...");
     rd_init(132211UL,RD_HILLS);
@@ -198,7 +182,7 @@ int main(int argc,char **argv) {
     _dos_setvect(0x09,mine_irq1);
     if(keytest) {
         /* No raycasting or physics. The bars must change immediately. */
-        while(!keys[0x01]&&!edges[0x01]){
+        while(!keyboard.down[0x01]&&!keyboard.edge[0x01]) {
             keytest_bars();
         }
         _dos_setvect(0x09,previous_irq1);
@@ -207,7 +191,8 @@ int main(int argc,char **argv) {
         return 0;
     }
     began=last=auto_since=timer_ticks();
-    while(!keys[0x01] && !keys[0x10] && !edges[0x01] && !edges[0x10]) { /* ESC or Q */
+    while(!keyboard.down[0x01] && !keyboard.down[0x10] &&
+          !keyboard.edge[0x01] && !keyboard.edge[0x10]) {
         int w=quality==3?80:(quality==0?20:40);
         int h=quality==0?25:(quality==1?40:50);
         now=timer_ticks();
@@ -220,16 +205,10 @@ int main(int argc,char **argv) {
         steps=(int)(elapsed*60UL/18UL);
         if(steps<1) steps=1;
         if(steps>4) steps=4;
-        if(pressed(0x23)) {quality=(quality+1)%4;auto_quality=0;} /* H */
-        read_controls(&in);
-        {unsigned long look_ticks=elapsed>8UL?8UL:(elapsed<1UL?1UL:elapsed);
-         in.yaw*= (float)look_ticks;
-         in.pitch*= (float)look_ticks;}
-        /* CRITICAL: consume edges BEFORE rendering. Presses arriving
-         * during a long render remain latched for the next frame.
-         * Old code cleared them after rendering and silently lost events.
-         */
-        capture_keys();
+        sample_keys();
+        mine_key_controls(&snapshot,elapsed,&in,&commands);
+        if(commands.quit) break;
+        if(commands.quality_cycle) {quality=(quality+1)%4;auto_quality=0;}
         if(bench) {
             float x,y,z,yaw,pitch;
             rd_player_pos(player,&x,&y,&z);
@@ -263,7 +242,7 @@ int main(int argc,char **argv) {
             }
         }
         if(bench && frames>=BENCH_FRAMES) break;
-        if(edges[0x01]||edges[0x10]) break; /* short ESC/Q while rendering */
+        if(keyboard.edge[0x01]||keyboard.edge[0x10]) break; /* ESC/Q during render */
     }
     _dos_setvect(0x09,previous_irq1);
     mode_set(previous_mode);

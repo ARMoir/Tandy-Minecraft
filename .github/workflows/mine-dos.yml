@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
+          wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c platforms/dos16/mine_keys.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
           test -s MINE.EXE
           python3 - <<'PY'
           from pathlib import Path
@@ -84,6 +84,14 @@ jobs:
           ./test-mid
           cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-motion tools/test_dos_motion.c src/rd.c
           ./test-motion
+      - name: Verify every Tandy key and camera horizon movement
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-keys tools/test_tandy_keys.c platforms/dos16/mine_keys.c
+          ./test-keys
+          cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-camera tools/test_tandy_camera.c platforms/dos16/mine_keys.c src/rd.c src/rd_fast.c src/rd_terrain.c
+          ./test-camera
       - name: Upload DOS build
         uses: actions/upload-artifact@v4
         with:

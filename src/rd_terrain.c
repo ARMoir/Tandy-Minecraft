@@ -127,7 +127,10 @@ void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
     eye=(int)((py+1.62f)*256.0f);
     phase=heading(yaw);
     sn=sintable[phase];cs=sintable[(phase+64)&255];
-    center=height/2+(int)(pitch*(float)(height/3));
+    /* In the 2.5-D terrain renderer this IS the visible sky/ground horizon.
+     * Use the full vertical view scale so Up/Down visibly tilt the scene.
+     */
+    center=height/2+(int)(pitch*((float)height/2.0f));
     zoom=height==50?zoom50:(height==40?zoom40:zoom25);
     /* Distinct blue sky and grassy ground below the true horizon. */
     for(j=0;j<height;j++){
@@ -175,6 +178,20 @@ void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
             prevground=ground;
             if(clip==0)break;
         }
+    }
+    /* Tiny top-right compass: yellow dot moves as Left/Right changes yaw.
+     * This makes camera rotation obvious even when facing empty sky.
+     */
+    if(width>=20&&height>=16) {
+        int cx=width-4,cy=3,dx=(sn>95?1:(sn< -95?-1:0));
+        int dy=(cs>95?-1:(cs< -95?1:0));
+        int tx,ty;
+        for(ty=-2;ty<=2;ty++)
+            for(tx=-2;tx<=2;tx++)
+                image[(unsigned)(cy+ty)*width+(unsigned)(cx+tx)]=
+                    (tx==-2||tx==2||ty==-2||ty==2)?8:0;
+        image[(unsigned)cy*width+(unsigned)cx]=15;
+        image[(unsigned)(cy+dy)*width+(unsigned)(cx+dx)]=14;
     }
     /* Small, high-contrast center reticle rather than a giant /LOW cross. */
     i=width/2;j=height/2;

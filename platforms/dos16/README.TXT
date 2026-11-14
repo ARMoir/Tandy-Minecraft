@@ -100,3 +100,23 @@ INPUT FIX (Build #15+):
   appear. Green means held, magenta means a queued press. ESC exits.
   This separates real keyboard/IRQ trouble from slow rendering.
 Run MINE.EXE /KEYTEST to check keys before judging real gameplay.
+
+KEYBOARD AUDIT:
+  W / S         Forward / back
+  A / D         Strafe left / right (these do NOT turn)
+  LEFT / RIGHT  Turn the camera, yellow compass dot moves horizontally
+  UP / DOWN     Look up/down; the sky/ground horizon MUST move visibly
+  SPACE         Jump
+  F / E         Dig / place aimed block
+  1...7         Select a block
+  R             Respawn in world center facing inward (DOS only)
+  H             Cycle screen resolution
+  ESC or Q      Save and exit
+  /KEYTEST      Test eight keyboard bars without the 3D renderer
+
+The actual XT scan-code decoder is now shared by DOS runtime and host tests.
+It understands legacy arrow scan codes and E0 enhanced keyboard prefixes.
+Short taps are latched across slow frames, while holds are accumulated for
+camera rotation. Test-mode bars use correct odd/even Tandy video scanlines.
+Pitch changes are mapped to an explicitly visible horizon shift, while a
+tiny top-right yellow compass moves with yaw.

@@ -233,3 +233,15 @@ The DOS physics loop skips idle target raycasting, and has higher movement
 acceleration for genuinely slow frame rates. Normal AUTO is a balanced
 40x40 display; `/DETAIL` retains the previous 40x50 visuals.
 `MINE.EXE /KEYTEST` shows instant keyboard activity without rendering.
+
+#### Tandy keys & camera verification
+The DOS keyboard IRQ now routes raw XT scan set 1 through
+`platforms/dos16/mine_keys.c`, with an E0-aware make/break parser, a
+race-safe pre-frame snapshot and short-press latching. Host regression
+tests verify W/A/S/D, all four arrow keys, Space, F, E, R, H, 1–7 and
+Escape/Q as well as actual core yaw/pitch and horizon displacement.
+UP/DOWN shifts the sky/ground horizon; LEFT/RIGHT changes heading.
+A tiny compass at the top-right makes rotation recognizable.
+The DOS-only respawn now starts at the centered world location facing
+inward, rather than near a random world edge. Other platforms keep the
+original spawn behavior.

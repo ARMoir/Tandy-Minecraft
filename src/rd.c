@@ -257,8 +257,19 @@ void rd_set_view_distance(int blocks_) { view_distance = (float)(blocks_ < 4 ? 4
 /* rd-132211 drops the player from above the level at a random spot. This
  * puts them on the surface there instead, so nobody waits for the fall. */
 static void respawn(player *p) {
+#ifdef RD_DOS16
+    /* A repeatable, centered, inward-facing view makes strafing and
+     * looking around understandable in this very small 32x32 world.
+     * The original desktop renderer retains its random spawn.
+     */
+    p->x = (float)RD_X * 0.5f + 0.5f;
+    p->z = (float)RD_Z * 0.5f + 0.5f;
+    p->yaw = 0.0f; /* toward +Z, at least half a world ahead */
+    p->pitch = -0.10f; /* slight downward view of the grass */
+#else
     p->x = 2 + frand() * (RD_X - 4);
     p->z = 2 + frand() * (RD_Z - 4);
+#endif
     p->y = (float)light_depth[(int)p->x + (int)p->z * RD_X];
     p->xd = p->yd = p->zd = 0;
     p->on_ground = 0;
