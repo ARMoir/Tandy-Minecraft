@@ -125,7 +125,7 @@ static void save_world(void) {
 }
 
 int main(int argc,char **argv) {
-    int quality=1,auto_quality=1,auto_frames=0,bench=0,old_renderer=0,player,frames=0,i,steps;
+    int quality=1,auto_quality=1,auto_frames=0,bench=0,render_mode=0,player,frames=0,i,steps;
     unsigned previous_mode;
     unsigned long began,last,now,elapsed,fps10,auto_since;
     rd_input in;
@@ -134,12 +134,14 @@ int main(int argc,char **argv) {
         if(!strcmp(argv[i],"/LOW") || !strcmp(argv[i],"/low")) {quality=0;auto_quality=0;}
         if(!strcmp(argv[i],"/AUTO") || !strcmp(argv[i],"/auto")) {quality=1;auto_quality=1;}
         if(!strcmp(argv[i],"/BENCH") || !strcmp(argv[i],"/bench")) bench=1;
-        if(!strcmp(argv[i],"/OLD") || !strcmp(argv[i],"/old")) old_renderer=1;
+        if(!strcmp(argv[i],"/OLD") || !strcmp(argv[i],"/old")) render_mode=2;
+        if(!strcmp(argv[i],"/FULL") || !strcmp(argv[i],"/full")) render_mode=1;
+        if(!strcmp(argv[i],"/TERRAIN") || !strcmp(argv[i],"/terrain")) render_mode=0;
     }
     printf("MINE - Minecraft for Tandy 1000 EX / V20\n");
     printf("World: 32x24x32, video: Tandy 160x200 16 colors.\n");
     printf("WASD move, arrows look, SPACE jump, F dig, E place, 1-7 blocks, R reset.\n");
-    printf("ESC/Q quit, AUTO detail, H manual, /LOW fast, /OLD backup.\n");
+    printf("ESC/Q quit, H detail, /LOW faster, /FULL full 3D, /OLD legacy.\n");
     rd_init(132211UL,RD_HILLS);
     player=rd_player_add();
     if(player<0) {puts("No free player slot.");return 1;}
@@ -177,8 +179,9 @@ int main(int argc,char **argv) {
             rd_player_input(player,&in);
             for(i=0;i<steps;i++) rd_tick();
         }
-        if(old_renderer)rd_legacy_render(player,indexed,w,h);
-        else rd_fast_render(player,indexed,w,h);
+        if(render_mode==2)rd_legacy_render(player,indexed,w,h);
+        else if(render_mode==1)rd_fast_render(player,indexed,w,h);
+        else rd_terrain_render(player,indexed,w,h);
         render_screen(w,h);
         frames++;
         /* Default AUTO uses a hysteresis gap to avoid thrashing between

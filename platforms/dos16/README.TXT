@@ -4,11 +4,11 @@ Target: 8088 / NEC V20 (7 MHz), DOS, Tandy/PCjr BIOS video mode 08h.
 Compiler: Open Watcom C/16, 8086 instructions, large memory model.
 
 RUN:
-  MINE.EXE           Default adaptive quality: 40x25 -> 20x25 if slow.
+  MINE.EXE           FAST terrain view, adaptive 40x25 -> 20x25 if slow.
   MINE.EXE /LOW      Force fastest 20x25, expanded to 160x200.
   MINE.EXE /HI       Force 80x50 internal texture detail (slowest).
   MINE.EXE /AUTO     Enable adaptive 20x25 / 40x25 mode.
-  MINE.EXE /OLD      Use previous quarter-block integer renderer.
+  MINE.EXE /FULL     Full 3D DDA textured voxels (much slower).\n  MINE.EXE /OLD      Earlier quarter-block 3D renderer (slowest).
   MINE.EXE /BENCH    Timed fixed 12-frame camera sweep, print FPS.
                      Combine with /LOW, /HI or /OLD; no world load/save.
 
@@ -50,7 +50,7 @@ BUILD:
 An up-to-date Linux/Windows host with C99 compiler and Open Watcom 2:
   cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o atlasgen tools/make_tandy_atlas.c
   atlasgen src/rd_tandy_atlas.h
-  wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c src/rd.c src/rd_fast.c src/rd_legacy.c
+  wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
 
 See .github/workflows/mine-dos.yml for the canonical automated build.
 The original rdgeneric platforms are preserved. License: see LICENSE.
@@ -59,3 +59,14 @@ Startup improvement: the 32x24x32 default world is procedurally generated
 on the CI host, run-length compressed and EMBEDDED inside MINE.EXE.
 No external data file is required. Saves in MINE.WLD override the default
 world during normal play. /BENCH always uses the embedded world.
+
+CRITICAL PERFORMANCE UPDATE:
+The default uses a Wolfenstein/Comanche-style terrain-column renderer.
+It uses one horizontal ray per screen column to project real Minecraft
+column heights and original preconverted block textures. This is an
+APPROXIMATE 2.5D landscape: caves, overhangs and underside faces do not
+render correctly; use /FULL for genuine 3D voxel views. Digging and placing
+blocks still use the original voxel world and physics, and visual edits to
+the top surface are visible. /FULL retains the genuine 3D DDA for later
+optimization and graphics comparisons. The original source art is kept in
+both paths. The renderer choice is configurable with /TERRAIN, /FULL, /OLD.

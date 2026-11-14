@@ -146,3 +146,9 @@ void rd_fast_render(int id,rd_u8 *pixels,int w,int h) {
                 (i==2||i==5||j==h-4||j==h-2)?0:ink;
     }
 }
+
+/* Shared atlas accessor: one copy of original textures in DOS binary. */
+rd_u8 rd_fast_texel(int block,int face,int index) {
+    if(block<=0||block>=RD_NUM_BLOCKS||face<0||face>=8)return 11;
+    return rd_tandy_atlas[block][face][index&255];
+}
