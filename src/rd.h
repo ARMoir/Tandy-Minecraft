@@ -27,8 +27,11 @@
 #endif
 
 typedef unsigned char rd_u8;
-/* 16-bit DOS compilers have 16-bit int; the core requires 32-bit pixels. */
-#if defined(RD_DOS16)
+/* rd_u32 must be exactly 32 bits. Watcom C/16 has a 16-bit int and
+ * 32-bit long; GCC on x86_64 has a 64-bit long. The host tests compile
+ * RD_DOS16 with GCC, including the float-bit fast square-root approximation.
+ */
+#if defined(RD_DOS16) && defined(__WATCOMC__)
 typedef unsigned long rd_u32;
 #else
 typedef unsigned int rd_u32;
