@@ -135,7 +135,7 @@ static void generate(int style) {
             } else {
                 int n = (value_noise(x, z, 32, world_seed) * 6 + value_noise(x, z, 12, world_seed + 1) * 3 +
                          value_noise(x, z, 5, world_seed + 2)) / 10;
-                top = (RD_Y * 35 + n * RD_Y * 35 / 1024) / 100;
+                top = (int)((RD_Y * 35L + (long)n * RD_Y * 35L / 1024L) / 100L);
             }
             if (top > RD_Y - 1) top = RD_Y - 1;
             for (int y = 0; y <= top; y++) {
@@ -168,7 +168,7 @@ static rd_u32 shade_rgb(rd_u32 c, float k) {
     if (r > 255) r = 255;
     if (g > 255) g = 255;
     if (b > 255) b = 255;
-    return (rd_u32)(r << 16 | g << 8 | b);
+    return ((rd_u32)r << 16) | ((rd_u32)g << 8) | (rd_u32)b;
 }
 
 static rd_u32 texel(int block, int face, int u, int v) {
@@ -326,6 +326,13 @@ static float clip_z(box c, box b, float za) {
     return za;
 }
 
+/* Standard C initializer rather than C99's unsupported compound literal. */
+static box cube_at(int x, int y, int z) {
+    box b = {(float)x, (float)y, (float)z,
+             x + 1.0f, y + 1.0f, z + 1.0f};
+    return b;
+}
+
 /* Entity.move from rd-132211: clip against every cube the swept box
  * touches, y first, then x, then z. */
 static void move(player *p, float xa, float ya, float za) {
@@ -349,7 +356,7 @@ static void move(player *p, float xa, float ya, float za) {
         for (int z = z0; z < z1; z++)                   \
             for (int x = x0; x < x1; x++)               \
                 if (blocks[idx(x, y, z)] != RD_AIR)
-#define CUBE ((box){(float)x, (float)y, (float)z, x + 1.0f, y + 1.0f, z + 1.0f})
+#define CUBE cube_at(x, y, z)
 
     EACH_CUBE ya = clip_y(CUBE, b, ya);
     b.y0 += ya, b.y1 += ya;
@@ -514,8 +521,9 @@ static const rd_u32 shirts[8] = {0x2a9d8f, 0xe76f51, 0x8e44ad, 0xf4a261,
 static rd_u32 lerp_rgb(rd_u32 a, rd_u32 b, float k) {
     int ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
     int br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
-    return (rd_u32)((int)(ar + (br - ar) * k) << 16 | (int)(ag + (bg - ag) * k) << 8 |
-                    (int)(ab + (bb - ab) * k));
+    return ((rd_u32)(int)(ar + (br - ar) * k) << 16) |
+           ((rd_u32)(int)(ag + (bg - ag) * k) << 8) |
+           (rd_u32)(int)(ab + (bb - ab) * k);
 }
 
 /* Ray against another player's box. Returns the colour, or 0 for a miss. */

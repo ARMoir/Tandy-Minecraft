@@ -27,7 +27,15 @@
 #endif
 
 typedef unsigned char rd_u8;
+/* 16-bit DOS compilers have 16-bit int; the core requires 32-bit pixels. */
+#if defined(RD_DOS16)
+typedef unsigned long rd_u32;
+#else
 typedef unsigned int rd_u32;
+#endif
+#if defined(RD_DOS16) && (RD_X * RD_Y * RD_Z >= 32768)
+#error DOS16 initial world must fit in a signed 16-bit array index
+#endif
 
 enum {
     RD_AIR = 0,

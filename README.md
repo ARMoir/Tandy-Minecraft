@@ -155,3 +155,17 @@ platforms/baremetal/      Multiboot kernel for x86
 tools/                    PDF writer, wasm inliner, snapshot renderer, embedded size check
 tests/run.sh              builds everything and checks each target
 ```
+
+## MINE.EXE: Tandy 1000 EX / 16-bit DOS
+
+The native DOS port is built from the single `main` branch using **Open Watcom C/16**.
+GitHub Actions generates `MINE.EXE` and `MINE-DOS.zip` and, after each successful
+new release, deletes every older GitHub release and its tag.
+
+[Download the newest release](https://github.com/ARMoir/Tandy-Minecraft/releases/latest).
+See [DOS controls, requirements, and limitations](platforms/dos16/README.TXT).
+
+The first port retains the original voxel logic and software-floating-point
+renderer, using an initial 32x24x32 world and Tandy BIOS mode 08h (160x200x16).
+Actual NEC V20 hardware speed still needs measurement. The remaining platforms
+and their tests are unchanged.
