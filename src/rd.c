@@ -587,7 +587,7 @@ void rd_render(int id, rd_u32 *fb, int w, int h, int stride) {
     float rx = cy_, rz = -sy_;                      /* right */
     float ux = -sy_ * sp, uy = cp, uz = -cy_ * sp;  /* up */
     float tan_v = 0.62f, tan_h = tan_v * w / h;
-    float far = view_distance, fog_start = far * 0.55f;
+    float view_far = view_distance, fog_start = view_far * 0.55f;
 
     for (int j = 0; j < h; j++) {
         float v = (1 - 2 * (j + 0.5f) / h) * tan_v;
@@ -600,8 +600,8 @@ void rd_render(int id, rd_u32 *fb, int w, int h, int stride) {
             rd_u32 sky = lerp_rgb(SKY, 0xc8e6ff, horizon * 0.6f);
             rd_u32 c = sky;
             hit hh;
-            float t = far;
-            if (cast(ox, oy, oz, dx, dy, dz, far, 1, &hh)) {
+            float t = view_far;
+            if (cast(ox, oy, oz, dx, dy, dz, view_far, 1, &hh)) {
                 t = hh.t;
                 float uu, vv;
                 c = face_texel(hh.block, hh.axis, hh.step, ox + dx * t, oy + dy * t, oz + dz * t, &uu, &vv);
@@ -619,7 +619,7 @@ void rd_render(int id, rd_u32 *fb, int w, int h, int stride) {
                 rd_u32 fc = hit_figure(&players[q], q, ox, oy, oz, dx, dy, dz, &t);
                 if (fc) c = fc;
             }
-            if (t > fog_start) c = lerp_rgb(c, sky, clampf((t - fog_start) / (far - fog_start), 0, 1));
+            if (t > fog_start) c = lerp_rgb(c, sky, clampf((t - fog_start) / (view_far - fog_start), 0, 1));
             row[i] = c;
         }
     }
