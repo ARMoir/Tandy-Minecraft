@@ -207,3 +207,10 @@ caves, overhangs and undersides to prioritize playable responsiveness.
 `/OLD` to the previous integer full-voxel prototype. This is an explicit
 visual tradeoff rather than a claim that a heightfield is a complete
 Minecraft 3D renderer.
+
+### Real-hardware diagnostic timing and input
+`/BENCH` now measures four frames (previously twelve) and prints separate
+world setup, renderer and Tandy video-copy times using BIOS timer ticks.
+Short key presses are latched by the keyboard interrupt until processed;
+Escape/Q can be used to quit after a currently rendering frame. To test
+movement, do not use /BENCH; run `MINE.EXE /LOW`.

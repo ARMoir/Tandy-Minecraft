@@ -9,7 +9,7 @@ RUN:
   MINE.EXE /HI       Force 80x50 internal texture detail (slowest).
   MINE.EXE /AUTO     Enable adaptive 20x25 / 40x25 mode.
   MINE.EXE /FULL     Full 3D DDA textured voxels (much slower).\n  MINE.EXE /OLD      Earlier quarter-block 3D renderer (slowest).
-  MINE.EXE /BENCH    Timed fixed 12-frame camera sweep, print FPS.
+  MINE.EXE /BENCH    Timed fixed four-frame camera sweep, print FPS.
                      Combine with /LOW, /HI or /OLD; no world load/save.
 
 CONTROLS:
@@ -70,3 +70,11 @@ blocks still use the original voxel world and physics, and visual edits to
 the top surface are visible. /FULL retains the genuine 3D DDA for later
 optimization and graphics comparisons. The original source art is kept in
 both paths. The renderer choice is configurable with /TERRAIN, /FULL, /OLD.
+
+Input and benchmark improvements:
+- Hardware keyboard make events are latched until the next frame so a quick
+  dig/place/quality/exit press is not lost during slow rendering.
+- /BENCH now runs four frames and reports separate setup, raycasting and
+  video output BIOS timer ticks. BENCH camera motion is AUTOMATIC: it does
+  not respond to movement keys. Run MINE.EXE /LOW for interactive testing.
+- Startup prints "World ready" and elapsed ticks before graphics mode.

@@ -13,13 +13,13 @@
 #define SCREEN_WIDTH_BYTES 80
 #define RENDER_MAX_W 80
 #define RENDER_MAX_H 50
-#define BENCH_FRAMES 12
+#define BENCH_FRAMES 4
 
 /* All arrays are under 64KB each for Open Watcom's large memory model. */
 static rd_u8 indexed[RENDER_MAX_W * RENDER_MAX_H];
 static rd_u8 packed[SCREEN_WIDTH_BYTES * RENDER_MAX_H];
 static volatile rd_u8 keys[128];
-static rd_u8 previous[128];
+static volatile rd_u8 edges[128]; /* preserve brief presses between slow frames */
 static void (__interrupt __far *previous_irq1)(void);
 
 static void mode_set(unsigned mode) {
@@ -79,16 +79,23 @@ static void __interrupt __far mine_irq1(void) {
     unsigned char ctrl=(unsigned char)inp(0x61);
     outp(0x61,ctrl|0x80);
     outp(0x61,ctrl);
-    if(sc!=0xE0 && sc!=0xE1)
-        keys[sc&0x7F]=(sc&0x80)?0:1;
+    if(sc!=0xE0 && sc!=0xE1) {
+        unsigned code=sc&0x7F;
+        if(sc&0x80) keys[code]=0;
+        else {
+            if(!keys[code]) edges[code]=1;
+            keys[code]=1;
+        }
+    }
     outp(0x20,0x20);
 }
 static int pressed(int scan) {
-    return keys[scan] && !previous[scan];
+    return edges[scan]!=0;
 }
 static void capture_keys(void) {
     int i;
-    for(i=0;i<128;i++) previous[i]=keys[i];
+    /* Clear one-shot makes only after all keys were processed this frame. */
+    for(i=0;i<128;i++) edges[i]=0;
 }
 
 static unsigned long timer_ticks(void) {
@@ -127,7 +134,8 @@ static void save_world(void) {
 int main(int argc,char **argv) {
     int quality=1,auto_quality=1,auto_frames=0,bench=0,render_mode=0,player,frames=0,i,steps;
     unsigned previous_mode;
-    unsigned long began,last,now,elapsed,fps10,auto_since;
+    unsigned long began,last,now,elapsed,fps10,auto_since,setup_start,setup_ticks;
+    unsigned long render_ticks=0,video_ticks=0,measured;
     rd_input in;
     for(i=1;i<argc;i++) {
         if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) {quality=2;auto_quality=0;}
@@ -142,12 +150,17 @@ int main(int argc,char **argv) {
     printf("World: 32x24x32, video: Tandy 160x200 16 colors.\n");
     printf("WASD move, arrows look, SPACE jump, F dig, E place, 1-7 blocks, R reset.\n");
     printf("ESC/Q quit, H detail, /LOW faster, /FULL full 3D, /OLD legacy.\n");
+    setup_start=timer_ticks();
+    puts("Loading embedded Minecraft world...");
     rd_init(132211UL,RD_HILLS);
     player=rd_player_add();
     if(player<0) {puts("No free player slot.");return 1;}
     if(bench) auto_quality=0; /* fixed resolution for comparable benchmarks */
     if(!bench) load_world();
     rd_set_view_distance(12);
+    setup_ticks=timer_ticks()-setup_start;
+    printf("World ready after %lu timer ticks (about %lu seconds).\n",
+           setup_ticks,setup_ticks/18UL);
     previous_mode=mode_get();
     mode_set(0x08);
     if(mode_get()!=0x08) {
@@ -159,7 +172,7 @@ int main(int argc,char **argv) {
     previous_irq1=_dos_getvect(0x09);
     _dos_setvect(0x09,mine_irq1);
     began=last=auto_since=timer_ticks();
-    while(!keys[0x01] && !keys[0x10]) { /* ESC or Q */
+    while(!keys[0x01] && !keys[0x10] && !edges[0x01] && !edges[0x10]) { /* ESC or Q */
         int w=quality==2?80:(quality==1?40:20);
         int h=quality==2?50:25;
         now=timer_ticks();
@@ -179,10 +192,14 @@ int main(int argc,char **argv) {
             rd_player_input(player,&in);
             for(i=0;i<steps;i++) rd_tick();
         }
+        measured=timer_ticks();
         if(render_mode==2)rd_legacy_render(player,indexed,w,h);
         else if(render_mode==1)rd_fast_render(player,indexed,w,h);
         else rd_terrain_render(player,indexed,w,h);
+        render_ticks+=timer_ticks()-measured;
+        measured=timer_ticks();
         render_screen(w,h);
+        video_ticks+=timer_ticks()-measured;
         frames++;
         /* Default AUTO uses a hysteresis gap to avoid thrashing between
          * resolutions on the 18.2Hz BIOS clock. Never selects slow /HI.
@@ -199,6 +216,7 @@ int main(int argc,char **argv) {
             }
         }
         if(bench && frames>=BENCH_FRAMES) break;
+        if(edges[0x01]||edges[0x10]) break; /* short ESC/Q while rendering */
         capture_keys();
     }
     _dos_setvect(0x09,previous_irq1);
@@ -207,7 +225,9 @@ int main(int argc,char **argv) {
     elapsed=timer_ticks()-began;
     if(!elapsed) elapsed=1;
     fps10=(unsigned long)frames*182UL/elapsed;
-    printf("MINE %d frames in %lu timer ticks (%lu.%lu fps).\n",
+    printf("MINE %d frames in %lu ticks (%lu.%lu fps).\n",
            frames,elapsed,fps10/10UL,fps10%10UL);
+    printf("Setup %lu ticks, renderer %lu ticks, video %lu ticks.\n",
+           setup_ticks,render_ticks,video_ticks);
     return 0;
 }
