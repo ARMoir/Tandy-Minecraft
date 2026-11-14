@@ -28,7 +28,8 @@ static float cos_(float x) { return sin_(x + PI / 2); }
 
 static float sqrt_(float v) {
     if (v <= 0) return 0;
-    union { float f; rd_u32 i; } u = {v};
+    union { float f; rd_u32 i; } u;
+    u.f = v;
     u.i = 0x1fbd1df5 + (u.i >> 1);
     float r = u.f;
     r = 0.5f * (r + v / r);
@@ -303,7 +304,9 @@ void rd_player_pos(int id, float *x, float *y, float *z) {
 typedef struct { float x0, y0, z0, x1, y1, z1; } box;
 
 static box player_box(const player *p) {
-    box b = {p->x - HALF_W, p->y, p->z - HALF_W, p->x + HALF_W, p->y + TALL, p->z + HALF_W};
+    box b;
+    b.x0 = p->x - HALF_W; b.y0 = p->y; b.z0 = p->z - HALF_W;
+    b.x1 = p->x + HALF_W; b.y1 = p->y + TALL; b.z1 = p->z + HALF_W;
     return b;
 }
 
@@ -328,8 +331,9 @@ static float clip_z(box c, box b, float za) {
 
 /* Standard C initializer rather than C99's unsupported compound literal. */
 static box cube_at(int x, int y, int z) {
-    box b = {(float)x, (float)y, (float)z,
-             x + 1.0f, y + 1.0f, z + 1.0f};
+    box b;
+    b.x0 = (float)x; b.y0 = (float)y; b.z0 = (float)z;
+    b.x1 = x + 1.0f; b.y1 = y + 1.0f; b.z1 = z + 1.0f;
     return b;
 }
 
@@ -532,8 +536,11 @@ static rd_u32 hit_figure(const player *q, int qi, float ox, float oy, float oz, 
     box b = player_box(q);
     float lo = 0, hi = *t_out;
     int axis = -1;
-    float o[3] = {ox, oy, oz}, d[3] = {dx, dy, dz};
-    float mn[3] = {b.x0, b.y0, b.z0}, mx[3] = {b.x1, b.y1, b.z1};
+    float o[3], d[3], mn[3], mx[3];
+    o[0]=ox; o[1]=oy; o[2]=oz;
+    d[0]=dx; d[1]=dy; d[2]=dz;
+    mn[0]=b.x0; mn[1]=b.y0; mn[2]=b.z0;
+    mx[0]=b.x1; mx[1]=b.y1; mx[2]=b.z1;
     for (int a = 0; a < 3; a++) {
         if (fabs_(d[a]) < 1e-6f) {
             if (o[a] < mn[a] || o[a] > mx[a]) return 0;
