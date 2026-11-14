@@ -44,3 +44,7 @@ lookup reciprocal tables; original block textures color-converted on build
 host with face shading and ordered dithering; bulk video-memory row copies.
 The original 3D game rules, physics and level saving remain in rdgeneric.
 Use /LOW /BENCH to establish a baseline on real 7MHz V20 hardware.
+
+RAM/startup improvement: the DOS build omits the original floating-point
+RGB texture generator and unused original RGB frame renderer entirely.
+Only the portable world/physics core and Tandy-indexed DDA renderer remain.

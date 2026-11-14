@@ -159,6 +159,7 @@ static void generate(int style) {
     rd_relight();
 }
 
+#ifndef RD_DOS16
 /* ---- textures, made procedurally at start ---- */
 
 #define TRANSPARENT 0x01000000u
@@ -217,6 +218,8 @@ static void make_textures(void) {
                 for (int u = 0; u < 16; u++) tex[b][f][v * 16 + u] = texel(b, f, u, v);
 }
 
+#endif /* !RD_DOS16: preconverted indexed atlas replaces runtime RGB textures */
+
 /* ---- players ---- */
 
 typedef struct {
@@ -249,7 +252,9 @@ static void respawn(player *p) {
 void rd_init(rd_u32 seed, int style) {
     world_seed = seed;
     rng_state = seed ? seed : 1;
+#ifndef RD_DOS16
     make_textures();
+#endif
     generate(style);
     for (int i = 0; i < RD_MAX_PLAYERS; i++) players[i].active = 0;
 }
@@ -395,6 +400,7 @@ typedef struct {
     float t;
 } hit;
 
+#ifndef RD_DOS16
 /* The texel a ray hits, shared by the walk (for leaf holes) and the
  * drawing, so both always agree on which texel was hit. */
 static rd_u32 face_texel(int block, int axis, int step, float hx, float hy, float hz, float *u_out,
@@ -408,6 +414,8 @@ static rd_u32 face_texel(int block, int axis, int step, float hx, float hy, floa
     int face = axis != 1 ? FACE_SIDE : step < 0 ? FACE_TOP : FACE_BOTTOM;
     return tex[block][face][((int)(v * 16) & 15) * 16 + ((int)(u * 16) & 15)];
 }
+
+#endif /* !RD_DOS16 */
 
 /* Walks the grid from o along d (Amanatides and Woo). When see_through is
  * set, transparent texels of leaves let the ray carry on. */
@@ -448,11 +456,13 @@ static int cast(float ox, float oy, float oz, float dx, float dy, float dz, floa
         h->axis = axis;
         h->step = axis == 0 ? sx : axis == 1 ? sy : sz;
         h->t = t;
+#ifndef RD_DOS16
         if (see_through && b == RD_LEAVES) {
             if (face_texel(b, axis, h->step, ox + dx * t, oy + dy * t, oz + dz * t, 0, 0) ==
                 TRANSPARENT)
                 continue;
         }
+#endif
         return 1;
     }
 }
@@ -521,6 +531,7 @@ void rd_tick(void) {
         if (players[i].active) tick_player(&players[i]);
 }
 
+#ifndef RD_DOS16
 /* ---- drawing ---- */
 
 #define SKY 0x80ccff /* rd-132211's clear colour, 0.5 0.8 1.0 */
@@ -631,3 +642,5 @@ void rd_render(int id, rd_u32 *fb, int w, int h, int stride) {
     }
     draw_hud(p, fb, w, h, stride);
 }
+
+#endif /* !RD_DOS16: DOS has an independent integer renderer */
