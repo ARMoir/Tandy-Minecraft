@@ -214,3 +214,12 @@ world setup, renderer and Tandy video-copy times using BIOS timer ticks.
 Short key presses are latched by the keyboard interrupt until processed;
 Escape/Q can be used to quit after a currently rendering frame. To test
 movement, do not use /BENCH; run `MINE.EXE /LOW`.
+
+### Quality-first readable terrain (Tandy)
+Default AUTO now begins at **40x50** textured internal pixels rather than
+40x25, while `/DETAIL` locks this quality even if FPS falls. The 2.5D
+renderer draws original grass-top textures over rolling ground, with
+stratified dirt/stone cliff faces and separate tree leaves/logs, rather than
+stretching the highest stone/leaf color down an entire 20x25 column.
+`/LOW` stays 20x25 for maximum speed; `/HI` renders 80x50; `/FULL`
+is still genuine 3D DDA. This does not introduce an arbitrary startup wait.

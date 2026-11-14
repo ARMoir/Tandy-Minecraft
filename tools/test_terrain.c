@@ -23,3 +23,6 @@ int main(void){
     printf("Terrain renderer OK: %d colors, %d yaw differences, %d world-edit differences\n",distinct,diffs(original,turned),diffs(original,empty));
     return 0;
 }
+
+/* Test separately above is intentionally kept at 20x25; the 40x50
+ * quality mode has its own regression with texture/geometry checks. */

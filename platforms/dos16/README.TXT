@@ -5,7 +5,7 @@ Compiler: Open Watcom C/16, 8086 instructions, large memory model.
 
 RUN:
   MINE.EXE           FAST terrain view, adaptive 40x25 -> 20x25 if slow.
-  MINE.EXE /LOW      Force fastest 20x25, expanded to 160x200.
+  MINE.EXE /DETAIL   Force clear 40x50 internal image (4x4 pixels).\n  MINE.EXE /LOW      Force fastest 20x25 (8x8 pixels).
   MINE.EXE /HI       Force 80x50 internal texture detail (slowest).
   MINE.EXE /AUTO     Enable adaptive 20x25 / 40x25 mode.
   MINE.EXE /FULL     Full 3D DDA textured voxels (much slower).\n  MINE.EXE /OLD      Earlier quarter-block 3D renderer (slowest).
@@ -78,3 +78,11 @@ Input and benchmark improvements:
   video output BIOS timer ticks. BENCH camera motion is AUTOMATIC: it does
   not respond to movement keys. Run MINE.EXE /LOW for interactive testing.
 - Startup prints "World ready" and elapsed ticks before graphics mode.
+
+GRAPHICS PASS: terrain mode now distinguishes original textured grass top
+surfaces, dirt/stone faces on steeper terrain and leafy canopies/logs.
+Former 20x25 view stretched pixels to 8x8 and often showed repetitive
+stone columns with green noise. Default is now 40x50 for legibility;
+/LOW remains available, and adaptive quality can switch there if needed.
+This costs some FPS but avoids the multi-minute true 3D renderer.
+For a fair test use MINE.EXE /DETAIL /BENCH and MINE.EXE /LOW /BENCH.

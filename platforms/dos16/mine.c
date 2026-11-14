@@ -1,6 +1,6 @@
 /* MINE.EXE - 8086/V20, real-mode DOS, Tandy 1000 160x200x16.
  * Uses the original rdgeneric engine; hardware-specific code lives here.
- * /LOW = 20x25, default = 40x25, /HI = 80x50; /BENCH = eight frames.
+ * /LOW 20x25, normal 40x50, /HI 80x50; /BENCH four frames.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -140,6 +140,7 @@ int main(int argc,char **argv) {
     for(i=1;i<argc;i++) {
         if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) {quality=2;auto_quality=0;}
         if(!strcmp(argv[i],"/LOW") || !strcmp(argv[i],"/low")) {quality=0;auto_quality=0;}
+        if(!strcmp(argv[i],"/DETAIL") || !strcmp(argv[i],"/detail")) {quality=1;auto_quality=0;}
         if(!strcmp(argv[i],"/AUTO") || !strcmp(argv[i],"/auto")) {quality=1;auto_quality=1;}
         if(!strcmp(argv[i],"/BENCH") || !strcmp(argv[i],"/bench")) bench=1;
         if(!strcmp(argv[i],"/OLD") || !strcmp(argv[i],"/old")) render_mode=2;
@@ -149,7 +150,7 @@ int main(int argc,char **argv) {
     printf("MINE - Minecraft for Tandy 1000 EX / V20\n");
     printf("World: 32x24x32, video: Tandy 160x200 16 colors.\n");
     printf("WASD move, arrows look, SPACE jump, F dig, E place, 1-7 blocks, R reset.\n");
-    printf("ESC/Q quit, H detail, /LOW faster, /FULL full 3D, /OLD legacy.\n");
+    printf("ESC/Q quit, H detail, /DETAIL clear, /LOW fast, /FULL 3D.\n");
     setup_start=timer_ticks();
     puts("Loading embedded Minecraft world...");
     rd_init(132211UL,RD_HILLS);
@@ -174,7 +175,7 @@ int main(int argc,char **argv) {
     began=last=auto_since=timer_ticks();
     while(!keys[0x01] && !keys[0x10] && !edges[0x01] && !edges[0x10]) { /* ESC or Q */
         int w=quality==2?80:(quality==1?40:20);
-        int h=quality==2?50:25;
+        int h=quality==0?25:50;
         now=timer_ticks();
         elapsed=now-last;
         last=now;
@@ -208,7 +209,7 @@ int main(int argc,char **argv) {
             unsigned long sample_end=timer_ticks();
             auto_frames++;
             if(quality==1 && auto_frames>=2) {
-                if(sample_end-auto_since>=8UL) quality=0;
+                if(sample_end-auto_since>=24UL) quality=0;
                 auto_since=sample_end;auto_frames=0;
             } else if(quality==0 && auto_frames>=8) {
                 if(sample_end-auto_since<=16UL) quality=1;
