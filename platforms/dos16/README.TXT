@@ -31,7 +31,7 @@ This build uses Tandy BIOS graphics mode 08h and video memory at B800:0000.
 Do not attempt to run it in an ordinary VGA-only DOS machine.
 
 Open Watcom C/16 build (see GitHub Actions for the canonical command):
-  wcl -bcl=dos -0 -ml -zastd=c99 -q -dRD_DOS16 -dRD_X=32 \
+  wcl -bcl=dos -0 -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 \
     -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE \
     platforms/dos16/mine.c src/rd.c
 
