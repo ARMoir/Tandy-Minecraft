@@ -518,7 +518,14 @@ static void tick_player(player *p) {
     float xa = in->strafe, za = in->forward;
     float dist = xa * xa + za * za;
     if (dist >= 0.01f) {
+        #ifdef RD_DOS16
+        /* Low-render-FPS machines need more useful displacement per tick.
+         * Keep normal physics/acceleration for the other platforms.
+         */
+        float speed = p->on_ground ? 0.045f : 0.012f;
+#else
         float speed = p->on_ground ? 0.02f : 0.005f;
+#endif
         dist = speed / sqrt_(dist);
         xa *= dist, za *= dist;
         float s = sin_(p->yaw), c = cos_(p->yaw);
@@ -530,7 +537,15 @@ static void tick_player(player *p) {
     p->xd *= 0.91f, p->yd *= 0.98f, p->zd *= 0.91f;
     if (p->on_ground) p->xd *= 0.8f, p->zd *= 0.8f;
 
+#ifdef RD_DOS16
+    /* The old code performs a software-floating voxel raycast on EVERY
+     * simulation tick. On V20 the terrain renderer doesn't display a
+     * targeting outline, so only target when the user requests an edit.
+     */
+    if (in->dig || in->place) update_target(p);
+#else
     update_target(p);
+#endif
     if (p->has_target && in->dig) {
         set_block(p->tx, p->ty, p->tz, RD_AIR);
         update_target(p);

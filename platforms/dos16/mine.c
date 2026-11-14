@@ -1,6 +1,6 @@
 /* MINE.EXE - 8086/V20, real-mode DOS, Tandy 1000 160x200x16.
  * Uses the original rdgeneric engine; hardware-specific code lives here.
- * /LOW 20x25, normal 40x50, /HI 80x50; /BENCH four frames.
+ * /LOW 20x25, normal 40x40, /DETAIL 40x50, /HI 80x50; /BENCH four frames.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,14 +104,35 @@ static unsigned long timer_ticks(void) {
     int86(0x1A,&r,&r);
     return ((unsigned long)r.x.cx<<16)|(unsigned long)r.x.dx;
 }
+/* Visual hardware input check, independent of gameplay/render FPS.
+ * Shows bright green if a key is held, magenta if a make event is queued.
+ * Key bar layout: W A S D Left Right Up Down, in that order.
+ */
+static void keytest_bars(void) {
+    static const int scan[8]={0x11,0x1E,0x1F,0x20,0x4B,0x4D,0x48,0x50};
+    rd_u8 __far *even=(rd_u8 __far *)MK_FP(0xB800,0);
+    rd_u8 __far *odd=(rd_u8 __far *)MK_FP(0xBA00,0);
+    int bar,y,j;
+    for(bar=0;bar<8;bar++){
+        rd_u8 color=keys[scan[bar]]?0xAA:(edges[scan[bar]]?0xDD:0x11);
+        for(y=0;y<10;y++){
+            unsigned offset=(unsigned)(bar*12+y)*80U;
+            rd_u8 __far *dst=y&1?odd:even; /* diagnostic only, two banks */
+            for(j=0;j<42;j++)dst[offset+(unsigned)j]=color;
+        }
+    }
+}
 static void read_controls(rd_input *in) {
     int i;
     memset(in,0,sizeof(*in));
-    in->forward=(keys[0x11]?1.0f:0.0f)-(keys[0x1F]?1.0f:0.0f);
-    in->strafe=(keys[0x20]?1.0f:0.0f)-(keys[0x1E]?1.0f:0.0f);
-    in->jump=keys[0x39]!=0;
-    in->yaw=((keys[0x4D]?1.0f:0.0f)-(keys[0x4B]?1.0f:0.0f))*0.09f;
-    in->pitch=((keys[0x48]?1.0f:0.0f)-(keys[0x50]?1.0f:0.0f))*0.07f;
+    in->forward=((keys[0x11]||edges[0x11])?1.0f:0.0f)-((keys[0x1F]||edges[0x1F])?1.0f:0.0f);
+    in->strafe=((keys[0x20]||edges[0x20])?1.0f:0.0f)-((keys[0x1E]||edges[0x1E])?1.0f:0.0f);
+    in->jump=keys[0x39]!=0 || edges[0x39]!=0;
+    /* Look speeds are scaled in the main loop to real elapsed BIOS ticks.
+     * IRQ key edges also count, even if released during the last render.
+     */
+    in->yaw=(((keys[0x4D]||edges[0x4D])?1.0f:0.0f)-((keys[0x4B]||edges[0x4B])?1.0f:0.0f))*0.06f;
+    in->pitch=(((keys[0x48]||edges[0x48])?1.0f:0.0f)-((keys[0x50]||edges[0x50])?1.0f:0.0f))*0.04f;
     in->dig=pressed(0x21); /* F */
     in->place=pressed(0x12); /* E */
     in->reset=pressed(0x13); /* R */
@@ -132,15 +153,17 @@ static void save_world(void) {
 }
 
 int main(int argc,char **argv) {
-    int quality=1,auto_quality=1,auto_frames=0,bench=0,render_mode=0,player,frames=0,i,steps;
+    int quality=1,auto_quality=1,auto_frames=0,bench=0,render_mode=0,keytest=0,player,frames=0,i,steps;
     unsigned previous_mode;
     unsigned long began,last,now,elapsed,fps10,auto_since,setup_start,setup_ticks;
     unsigned long render_ticks=0,video_ticks=0,measured;
     rd_input in;
     for(i=1;i<argc;i++) {
-        if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) {quality=2;auto_quality=0;}
+        if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) {quality=3;auto_quality=0;}
         if(!strcmp(argv[i],"/LOW") || !strcmp(argv[i],"/low")) {quality=0;auto_quality=0;}
-        if(!strcmp(argv[i],"/DETAIL") || !strcmp(argv[i],"/detail")) {quality=1;auto_quality=0;}
+        if(!strcmp(argv[i],"/DETAIL") || !strcmp(argv[i],"/detail")) {quality=2;auto_quality=0;}
+        if(!strcmp(argv[i],"/MID") || !strcmp(argv[i],"/mid")) {quality=1;auto_quality=0;}
+        if(!strcmp(argv[i],"/KEYTEST") || !strcmp(argv[i],"/keytest")) keytest=1;
         if(!strcmp(argv[i],"/AUTO") || !strcmp(argv[i],"/auto")) {quality=1;auto_quality=1;}
         if(!strcmp(argv[i],"/BENCH") || !strcmp(argv[i],"/bench")) bench=1;
         if(!strcmp(argv[i],"/OLD") || !strcmp(argv[i],"/old")) render_mode=2;
@@ -150,7 +173,8 @@ int main(int argc,char **argv) {
     printf("MINE - Minecraft for Tandy 1000 EX / V20\n");
     printf("World: 32x24x32, video: Tandy 160x200 16 colors.\n");
     printf("WASD move, arrows look, SPACE jump, F dig, E place, 1-7 blocks, R reset.\n");
-    printf("ESC/Q quit, H detail, /DETAIL clear, /LOW fast, /FULL 3D.\n");
+    printf("ESC/Q quit, H detail, /MID 40x40, /DETAIL 40x50, /KEYTEST.\n");
+    if(keytest) puts("KEYTEST: W A S D, then arrow keys. Green bars = held. ESC exits.");
     setup_start=timer_ticks();
     puts("Loading embedded Minecraft world...");
     rd_init(132211UL,RD_HILLS);
@@ -172,18 +196,40 @@ int main(int argc,char **argv) {
     draw_startup();
     previous_irq1=_dos_getvect(0x09);
     _dos_setvect(0x09,mine_irq1);
+    if(keytest) {
+        /* No raycasting or physics. The bars must change immediately. */
+        while(!keys[0x01]&&!edges[0x01]){
+            keytest_bars();
+        }
+        _dos_setvect(0x09,previous_irq1);
+        mode_set(previous_mode);
+        puts("Keyboard test finished; no world changes.");
+        return 0;
+    }
     began=last=auto_since=timer_ticks();
     while(!keys[0x01] && !keys[0x10] && !edges[0x01] && !edges[0x10]) { /* ESC or Q */
-        int w=quality==2?80:(quality==1?40:20);
-        int h=quality==0?25:50;
+        int w=quality==3?80:(quality==0?20:40);
+        int h=quality==0?25:(quality==1?40:50);
         now=timer_ticks();
         elapsed=now-last;
         last=now;
+        /* Each physics tick is costly on software-floating V20.
+         * Time-based look acceleration prevents camera rotation from
+         * slowing down in proportion to FPS; bound long pauses.
+         */
         steps=(int)(elapsed*60UL/18UL);
         if(steps<1) steps=1;
         if(steps>4) steps=4;
-        if(pressed(0x23)) {quality=(quality+1)%3;auto_quality=0;} /* H */
+        if(pressed(0x23)) {quality=(quality+1)%4;auto_quality=0;} /* H */
         read_controls(&in);
+        {unsigned long look_ticks=elapsed>8UL?8UL:(elapsed<1UL?1UL:elapsed);
+         in.yaw*= (float)look_ticks;
+         in.pitch*= (float)look_ticks;}
+        /* CRITICAL: consume edges BEFORE rendering. Presses arriving
+         * during a long render remain latched for the next frame.
+         * Old code cleared them after rendering and silently lost events.
+         */
+        capture_keys();
         if(bench) {
             float x,y,z,yaw,pitch;
             rd_player_pos(player,&x,&y,&z);
@@ -209,7 +255,7 @@ int main(int argc,char **argv) {
             unsigned long sample_end=timer_ticks();
             auto_frames++;
             if(quality==1 && auto_frames>=2) {
-                if(sample_end-auto_since>=24UL) quality=0;
+                if(sample_end-auto_since>=18UL) quality=0;
                 auto_since=sample_end;auto_frames=0;
             } else if(quality==0 && auto_frames>=8) {
                 if(sample_end-auto_since<=16UL) quality=1;
@@ -218,7 +264,6 @@ int main(int argc,char **argv) {
         }
         if(bench && frames>=BENCH_FRAMES) break;
         if(edges[0x01]||edges[0x10]) break; /* short ESC/Q while rendering */
-        capture_keys();
     }
     _dos_setvect(0x09,previous_irq1);
     mode_set(previous_mode);

@@ -33,6 +33,9 @@ static const unsigned short zoom50[TERRAIN_STEPS]={
     8192, 5461, 4096, 3277, 2731, 2341, 2048, 1820, 1638, 1489, 1365, 1260, 1170, 1092, 1024, 964, 910, 862, 819, 780, 745, 712, 683, 655
 };
 
+static const unsigned short zoom40[TERRAIN_STEPS]={
+    6656, 4437, 3328, 2662, 2219, 1902, 1664, 1479, 1331, 1210, 1109, 1024, 951, 887, 832, 783, 740, 701, 666, 634, 605, 579, 555, 532
+};
 static int heading(float radians) {
     return (int)(((long)(radians*40.743665f))&255L);
 }
@@ -125,7 +128,7 @@ void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
     phase=heading(yaw);
     sn=sintable[phase];cs=sintable[(phase+64)&255];
     center=height/2+(int)(pitch*(float)(height/3));
-    zoom=height==50?zoom50:zoom25;
+    zoom=height==50?zoom50:(height==40?zoom40:zoom25);
     /* Distinct blue sky and grassy ground below the true horizon. */
     for(j=0;j<height;j++){
         rd_u8 ink=j<center-2?11:(j<center?9:2);

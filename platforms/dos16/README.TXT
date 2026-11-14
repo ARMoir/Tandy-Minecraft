@@ -4,7 +4,7 @@ Target: 8088 / NEC V20 (7 MHz), DOS, Tandy/PCjr BIOS video mode 08h.
 Compiler: Open Watcom C/16, 8086 instructions, large memory model.
 
 RUN:
-  MINE.EXE           FAST terrain view, adaptive 40x25 -> 20x25 if slow.
+  MINE.EXE           Terrain view, adaptive 40x40 -> 20x25 if slow.
   MINE.EXE /DETAIL   Force clear 40x50 internal image (4x4 pixels).\n  MINE.EXE /LOW      Force fastest 20x25 (8x8 pixels).
   MINE.EXE /HI       Force 80x50 internal texture detail (slowest).
   MINE.EXE /AUTO     Enable adaptive 20x25 / 40x25 mode.
@@ -86,3 +86,17 @@ stone columns with green noise. Default is now 40x50 for legibility;
 /LOW remains available, and adaptive quality can switch there if needed.
 This costs some FPS but avoids the multi-minute true 3D renderer.
 For a fair test use MINE.EXE /DETAIL /BENCH and MINE.EXE /LOW /BENCH.
+
+INPUT FIX (Build #15+):
+- Prior keyboard handling discarded presses arriving during screen rendering.
+  Events are now consumed before each frame; presses occurring during drawing
+  remain latched for the next frame.
+- Camera turning now scales with elapsed BIOS timer ticks, not frame count.
+- DOS physics avoids expensive target raycasting except for dig/place.
+- DOS-only movement acceleration is increased for low-FPS systems.
+- Default AUTO now starts at 40x40, with /MID forcing it.
+- /DETAIL forces 40x50; /HI forces 80x50; /LOW is fastest.
+- /KEYTEST bypasses gameplay rendering: four WASD and four arrow-key bars
+  appear. Green means held, magenta means a queued press. ESC exits.
+  This separates real keyboard/IRQ trouble from slow rendering.
+Run MINE.EXE /KEYTEST to check keys before judging real gameplay.

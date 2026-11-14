@@ -223,3 +223,13 @@ stratified dirt/stone cliff faces and separate tree leaves/logs, rather than
 stretching the highest stone/leaf color down an entire 20x25 column.
 `/LOW` stays 20x25 for maximum speed; `/HI` renders 80x50; `/FULL`
 is still genuine 3D DDA. This does not introduce an arbitrary startup wait.
+
+### DOS responsiveness correction
+At ~1.4 FPS the old keyboard code dropped events generated during rendering:
+it cleared the edge latch after drawing, rather than when controls were read.
+The DOS loop now consumes events before drawing so new IRQ events survive.
+Camera yaw/pitch scale with elapsed BIOS ticks to reduce turn sluggishness.
+The DOS physics loop skips idle target raycasting, and has higher movement
+acceleration for genuinely slow frame rates. Normal AUTO is a balanced
+40x40 display; `/DETAIL` retains the previous 40x50 visuals.
+`MINE.EXE /KEYTEST` shows instant keyboard activity without rendering.
