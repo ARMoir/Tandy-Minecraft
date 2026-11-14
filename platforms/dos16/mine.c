@@ -125,23 +125,25 @@ static void save_world(void) {
 }
 
 int main(int argc,char **argv) {
-    int quality=1,bench=0,old_renderer=0,player,frames=0,i,steps;
+    int quality=1,auto_quality=1,auto_frames=0,bench=0,old_renderer=0,player,frames=0,i,steps;
     unsigned previous_mode;
-    unsigned long began,last,now,elapsed,fps10;
+    unsigned long began,last,now,elapsed,fps10,auto_since;
     rd_input in;
     for(i=1;i<argc;i++) {
-        if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) quality=2;
-        if(!strcmp(argv[i],"/LOW") || !strcmp(argv[i],"/low")) quality=0;
+        if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) {quality=2;auto_quality=0;}
+        if(!strcmp(argv[i],"/LOW") || !strcmp(argv[i],"/low")) {quality=0;auto_quality=0;}
+        if(!strcmp(argv[i],"/AUTO") || !strcmp(argv[i],"/auto")) {quality=1;auto_quality=1;}
         if(!strcmp(argv[i],"/BENCH") || !strcmp(argv[i],"/bench")) bench=1;
         if(!strcmp(argv[i],"/OLD") || !strcmp(argv[i],"/old")) old_renderer=1;
     }
     printf("MINE - Minecraft for Tandy 1000 EX / V20\n");
     printf("World: 32x24x32, video: Tandy 160x200 16 colors.\n");
     printf("WASD move, arrows look, SPACE jump, F dig, E place, 1-7 blocks, R reset.\n");
-    printf("ESC/Q exit, H changes detail, /LOW starts fast. Saves MINE.WLD.\n");
+    printf("ESC/Q quit, AUTO detail, H manual, /LOW fast, /OLD backup.\n");
     rd_init(132211UL,RD_HILLS);
     player=rd_player_add();
     if(player<0) {puts("No free player slot.");return 1;}
+    if(bench) auto_quality=0; /* fixed resolution for comparable benchmarks */
     if(!bench) load_world();
     rd_set_view_distance(12);
     previous_mode=mode_get();
@@ -154,7 +156,7 @@ int main(int argc,char **argv) {
     draw_startup();
     previous_irq1=_dos_getvect(0x09);
     _dos_setvect(0x09,mine_irq1);
-    began=last=timer_ticks();
+    began=last=auto_since=timer_ticks();
     while(!keys[0x01] && !keys[0x10]) { /* ESC or Q */
         int w=quality==2?80:(quality==1?40:20);
         int h=quality==2?50:25;
@@ -164,7 +166,7 @@ int main(int argc,char **argv) {
         steps=(int)(elapsed*60UL/18UL);
         if(steps<1) steps=1;
         if(steps>4) steps=4;
-        if(pressed(0x23)) quality=(quality+1)%3; /* H */
+        if(pressed(0x23)) {quality=(quality+1)%3;auto_quality=0;} /* H */
         read_controls(&in);
         if(bench) {
             float x,y,z,yaw,pitch;
@@ -179,6 +181,20 @@ int main(int argc,char **argv) {
         else rd_fast_render(player,indexed,w,h);
         render_screen(w,h);
         frames++;
+        /* Default AUTO uses a hysteresis gap to avoid thrashing between
+         * resolutions on the 18.2Hz BIOS clock. Never selects slow /HI.
+         */
+        if(auto_quality) {
+            unsigned long sample_end=timer_ticks();
+            auto_frames++;
+            if(quality==1 && auto_frames>=2) {
+                if(sample_end-auto_since>=8UL) quality=0;
+                auto_since=sample_end;auto_frames=0;
+            } else if(quality==0 && auto_frames>=8) {
+                if(sample_end-auto_since<=16UL) quality=1;
+                auto_since=sample_end;auto_frames=0;
+            }
+        }
         if(bench && frames>=BENCH_FRAMES) break;
         capture_keys();
     }

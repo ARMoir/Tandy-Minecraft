@@ -183,3 +183,10 @@ offline-converted original 16x16 rdgeneric Minecraft textures with palette
 dithering, and bulk Tandy video row copying. No float math or RGB mapping
 runs per pixel. The old integer sampler is available via `/OLD`. Benchmark
 on real hardware with `MINE.EXE /LOW /BENCH` (fixed camera sweep, no save).
+
+#### Adaptive Tandy performance profile
+The default MINE.EXE build begins at the 40x25 textured internal viewport,
+then falls back to 20x25 if the observed two-frame interval is too slow.
+It can return to 40x25 after sustained speed improvement; it never selects
+80x50 automatically. `/LOW`, `/HI`, or H override AUTO. Benchmark flags
+remain deterministic and don't touch world saves.
