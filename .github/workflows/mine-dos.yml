@@ -22,11 +22,18 @@ jobs:
         with:
           version: '2.0'
           target: dos
+      - name: Generate original block textures in Tandy palette on host
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o atlasgen tools/make_tandy_atlas.c
+          ./atlasgen src/rd_tandy_atlas.h
+          test -s src/rd_tandy_atlas.h
       - name: Build true 8086-compatible 16-bit DOS executable
         shell: bash
         run: |
           set -euo pipefail
-          wcl -bcl=dos -0 -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c src/rd.c src/rd_fast.c
+          wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c src/rd.c src/rd_fast.c src/rd_legacy.c
           test -s MINE.EXE
           python3 - <<'PY'
           from pathlib import Path
@@ -46,7 +53,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-fast tools/test_fast.c src/rd.c src/rd_fast.c
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-fast tools/test_fast.c src/rd.c src/rd_fast.c src/rd_legacy.c
           ./test-fast
       - name: Upload DOS build
         uses: actions/upload-artifact@v4

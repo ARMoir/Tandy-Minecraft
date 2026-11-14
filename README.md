@@ -176,3 +176,10 @@ The DOS build uses an optimized, DOS-only fixed-point voxel ray marcher
 (`src/rd_fast.c`), retaining the original rdgeneric world/physics and modern
 platform renderer. The Tandy mode immediately displays a color pattern while
 entering gameplay. Switch quality with H or start with `MINE.EXE /LOW`.
+
+### Texture-preserving V20 optimization
+Native DOS uses WolfensteinCGA-inspired fixed-point 3D boundary traversal,
+offline-converted original 16x16 rdgeneric Minecraft textures with palette
+dithering, and bulk Tandy video row copying. No float math or RGB mapping
+runs per pixel. The old integer sampler is available via `/OLD`. Benchmark
+on real hardware with `MINE.EXE /LOW /BENCH` (fixed camera sweep, no save).

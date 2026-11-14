@@ -13,7 +13,7 @@
 #define SCREEN_WIDTH_BYTES 80
 #define RENDER_MAX_W 80
 #define RENDER_MAX_H 50
-#define BENCH_FRAMES 8
+#define BENCH_FRAMES 12
 
 /* All arrays are under 64KB each for Open Watcom's large memory model. */
 static rd_u8 indexed[RENDER_MAX_W * RENDER_MAX_H];
@@ -47,28 +47,27 @@ static void draw_startup(void) {
         for(x=0;x<80;x++) video[base+(unsigned)x]=c;
     }
 }
-/* Tandy BIOS mode 08h: 160x200x16, B800:0000/2000 interleave. */
+/* Two 80-byte bulk transfers per Tandy odd/even scanline pair,
+ * instead of 16,000 far-pointer byte writes per rendered frame.
+ */
 static void render_screen(int w,int h) {
-    rd_u8 __far *video=(rd_u8 __far *)MK_FP(0xB800,0);
-    int sx,sy,byte_x,y;
-    int replicate=SCREEN_WIDTH_BYTES/w;
-    int lines=200/h;
+    rd_u8 __far *even=(rd_u8 __far *)MK_FP(0xB800,0);
+    rd_u8 __far *odd=(rd_u8 __far *)MK_FP(0xBA00,0);
+    int sy,x,y,repeat=SCREEN_WIDTH_BYTES/w,lines=200/h;
     for(sy=0;sy<h;sy++) {
         unsigned row=(unsigned)sy*SCREEN_WIDTH_BYTES;
-        unsigned pixrow=(unsigned)sy*(unsigned)w;
-        for(byte_x=0;byte_x<SCREEN_WIDTH_BYTES;byte_x++) {
-            sx=byte_x/replicate;
-            {
-                rd_u8 ink=indexed[pixrow+(unsigned)sx]&15;
-                packed[row+(unsigned)byte_x]=(rd_u8)((ink<<4)|ink);
-            }
+        unsigned inrow=(unsigned)sy*(unsigned)w;
+        for(x=0;x<SCREEN_WIDTH_BYTES;x++) {
+            rd_u8 ink=indexed[inrow+(unsigned)(x/repeat)]&15;
+            packed[row+(unsigned)x]=(rd_u8)((ink<<4)|ink);
         }
     }
-    for(y=0;y<200;y++) {
-        unsigned base=(unsigned)((y&1)?0x2000:0)+((unsigned)y/2)*SCREEN_WIDTH_BYTES;
-        unsigned src=(unsigned)(y/lines)*SCREEN_WIDTH_BYTES;
-        for(byte_x=0;byte_x<SCREEN_WIDTH_BYTES;byte_x++)
-            video[base+(unsigned)byte_x]=packed[src+(unsigned)byte_x];
+    for(y=0;y<100;y++) {
+        unsigned offset=(unsigned)y*SCREEN_WIDTH_BYTES;
+        unsigned row_even=((unsigned)(2*y)/lines)*SCREEN_WIDTH_BYTES;
+        unsigned row_odd=((unsigned)(2*y+1)/lines)*SCREEN_WIDTH_BYTES;
+        _fmemcpy(even+offset,packed+row_even,SCREEN_WIDTH_BYTES);
+        _fmemcpy(odd+offset,packed+row_odd,SCREEN_WIDTH_BYTES);
     }
 }
 /* Read make/break scan codes, including keys held across rendered frames.
@@ -126,7 +125,7 @@ static void save_world(void) {
 }
 
 int main(int argc,char **argv) {
-    int quality=1,bench=0,player,frames=0,i,steps;
+    int quality=1,bench=0,old_renderer=0,player,frames=0,i,steps;
     unsigned previous_mode;
     unsigned long began,last,now,elapsed,fps10;
     rd_input in;
@@ -134,6 +133,7 @@ int main(int argc,char **argv) {
         if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) quality=2;
         if(!strcmp(argv[i],"/LOW") || !strcmp(argv[i],"/low")) quality=0;
         if(!strcmp(argv[i],"/BENCH") || !strcmp(argv[i],"/bench")) bench=1;
+        if(!strcmp(argv[i],"/OLD") || !strcmp(argv[i],"/old")) old_renderer=1;
     }
     printf("MINE - Minecraft for Tandy 1000 EX / V20\n");
     printf("World: 32x24x32, video: Tandy 160x200 16 colors.\n");
@@ -142,7 +142,7 @@ int main(int argc,char **argv) {
     rd_init(132211UL,RD_HILLS);
     player=rd_player_add();
     if(player<0) {puts("No free player slot.");return 1;}
-    load_world();
+    if(!bench) load_world();
     rd_set_view_distance(12);
     previous_mode=mode_get();
     mode_set(0x08);
@@ -163,12 +163,20 @@ int main(int argc,char **argv) {
         last=now;
         steps=(int)(elapsed*60UL/18UL);
         if(steps<1) steps=1;
-        if(steps>12) steps=12;
+        if(steps>4) steps=4;
         if(pressed(0x23)) quality=(quality+1)%3; /* H */
         read_controls(&in);
-        rd_player_input(player,&in);
-        for(i=0;i<steps;i++) rd_tick();
-        rd_fast_render(player,indexed,w,h);
+        if(bench) {
+            float x,y,z,yaw,pitch;
+            rd_player_pos(player,&x,&y,&z);
+            rd_player_angles(player,&yaw,&pitch);
+            rd_player_set(player,x,y,z,yaw+0.12f,pitch);
+        } else {
+            rd_player_input(player,&in);
+            for(i=0;i<steps;i++) rd_tick();
+        }
+        if(old_renderer)rd_legacy_render(player,indexed,w,h);
+        else rd_fast_render(player,indexed,w,h);
         render_screen(w,h);
         frames++;
         if(bench && frames>=BENCH_FRAMES) break;
@@ -176,7 +184,7 @@ int main(int argc,char **argv) {
     }
     _dos_setvect(0x09,previous_irq1);
     mode_set(previous_mode);
-    save_world();
+    if(!bench) save_world();
     elapsed=timer_ticks()-began;
     if(!elapsed) elapsed=1;
     fps10=(unsigned long)frames*182UL/elapsed;

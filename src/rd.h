@@ -84,6 +84,7 @@ void rd_set_view_distance(int blocks); /* lower it on slow hardware */
 
 /* The level in rd-132211's layout, index (y * RD_Z + z) * RD_X + x. */
 rd_u8 *rd_blocks(void);
+const rd_u8 *rd_light_depth(void);
 int rd_world_bytes(void);
 void rd_relight(void); /* call after writing into rd_blocks() directly */
 

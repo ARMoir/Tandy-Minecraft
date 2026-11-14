@@ -90,6 +90,7 @@ void rd_relight(void) {
 }
 
 rd_u8 *rd_blocks(void) { return blocks; }
+const rd_u8 *rd_light_depth(void) { return light_depth; }
 int rd_world_bytes(void) { return (int)sizeof blocks; }
 
 /* Value noise in integers, 0..1023, at a grid spacing of `scale` cells.
