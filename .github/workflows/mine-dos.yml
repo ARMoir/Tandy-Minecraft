@@ -76,6 +76,14 @@ jobs:
           set -euo pipefail
           cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-detail tools/test_terrain_detail.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
           ./test-detail
+      - name: Test balanced 40x40 terrain and DOS movement
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-mid tools/test_mid.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
+          ./test-mid
+          cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-motion tools/test_dos_motion.c src/rd.c
+          ./test-motion
       - name: Upload DOS build
         uses: actions/upload-artifact@v4
         with:
