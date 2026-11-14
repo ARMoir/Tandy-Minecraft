@@ -39,7 +39,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-snapshot tools/snapshot.c src/rd.c
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=2 -o test-snapshot tools/snapshot.c src/rd.c
           ./test-snapshot snapshot.ppm 1 5 40 25
           test -s snapshot.ppm
       - name: Upload DOS build
