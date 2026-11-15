@@ -134,3 +134,8 @@ GEOMETRY FIX: The sky is cleared entirely to BLUE. Green ground is
 drawn only where actual world terrain projects onto the screen, rather
 than painting a fake rectangular lower half even for an empty world.
 The Up/Down horizon test now uses real flat grass geometry.
+
+TERRAIN DEPTH: A one-block stair-step now renders a small brown dirt side
+below its grassy top. Previously only rises above one block showed sides,
+making the usual Minecraft hills look like flat green noise. Starting DOS
+camera looks down slightly more to show the actual landscape.

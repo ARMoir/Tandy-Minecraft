@@ -265,7 +265,7 @@ static void respawn(player *p) {
     p->x = (float)RD_X * 0.5f + 0.5f;
     p->z = (float)RD_Z * 0.5f + 0.5f;
     p->yaw = 0.0f; /* toward +Z, at least half a world ahead */
-    p->pitch = -0.10f; /* slight downward view of the grass */
+    p->pitch = -0.23f; /* ground fills more of the opening view */
 #else
     p->x = 2 + frand() * (RD_X - 4);
     p->z = 2 + frand() * (RD_Z - 4);

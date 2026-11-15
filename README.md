@@ -264,3 +264,11 @@ clears to blue and uses real ground surfaces to establish the landscape
 silhouette. Empty world now renders as sky (plus HUD) and block edits
 visibly alter geometry. The world-image regression prints a coarse
 ASCII-map preview in Actions logs for a visual sanity check.
+
+### One-block hill readability
+The default fast terrain renderer now draws brown dirt faces for ordinary
+**one-block** height increases, not only rises of two or more blocks. Grass
+keeps a small cap on the ledge. The initial DOS camera is tilted slightly
+downward for a more useful view of the terrain. A new host test constructs a
+one-block grassy stair-step and checks that the dirt face appears, and that
+flattening the land removes it.

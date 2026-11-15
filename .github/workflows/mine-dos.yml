@@ -100,6 +100,12 @@ jobs:
           ./test-palette
           cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-visual tools/test_tandy_visual.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
           ./test-visual
+      - name: Confirm one-block hills show dirt sides
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-steps tools/test_terrain_steps.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
+          ./test-steps
       - name: Upload DOS build
         uses: actions/upload-artifact@v4
         with:

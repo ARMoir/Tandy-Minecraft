@@ -90,6 +90,11 @@ static void paint_ground(rd_u8 *image,const rd_u8 *world,
             u=(fixedx>>4)&15;
             v=((fixedz>>4)+(y-from)/3)&15;
         } else {
+            /* Even a SINGLE block rise exposes a dirt side. Otherwise
+             * a typical stair-stepped Minecraft hill is indistinguishable
+             * from a flat green sheet. Keep a two-pixel grass cap.
+             */
+            if(within>=2 && mat==RD_GRASS)mat=RD_DIRT;
             face=(within<2)?1:(facing?0:2);
             u=coord&15;
             v=((worldy<<2)+(y-from)/2)&15;
@@ -165,7 +170,7 @@ void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
             if(!ground)continue;
             if(!blockheight)blockheight=1;
             pyground=project(ground,eye,center,zoom[depth],height);
-            cliff=prevground>=0 && ground>prevground+1;
+            cliff=prevground>=0 && ground>prevground; /* one-block stairs have visible sides */
             if(pyground<clip){
                 paint_ground(image,world,width,height,i,pyground,clip,bx,bz,
                              x,z,ground,blockheight,depth,face_x,cliff);
