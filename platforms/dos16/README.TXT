@@ -56,3 +56,11 @@ V20 PERFORMANCE PASS:
 - 80/160/320-pixel frame packing eliminates pixel-index divisions and
   reduces frame-to-screen work while preserving mode 09h output.
 - CI verifies real DOSBox benchmark and exact native-host framebuffer.
+
+FURTHER V20 SPEED WORK:
+- Precomputed inverse-depth lookup for distant projected cube vertices,
+  avoiding two 32-bit divides per projected 3D corner; nearby faces stay
+  exact to retain sharp close blocks.
+- Replaced UV-edge 32-bit divisions with native 16-bit divisions; texel
+  grid remains 16x16, and both DOS and host share the same math.
+- CI compares four frames against the previously verified Build #28.
