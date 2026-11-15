@@ -78,7 +78,7 @@ int main(void) {
         for(j=0;j<80;j++){
             int ch=buf[1+(i*80+j)*2],a=buf[2+(i*80+j)*2];
             char out=ch==219?'#':ch==178?'O':ch==177?'o':
-                     ch==176?'.':ch=='+':'+':(a>>4)==3?' ':' ';
+                     ch==176?'.':ch=='+'?'+':(a>>4)==3?' ':' ';
             fputc(out,f);
         }
         fputc('\n',f);
