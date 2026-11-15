@@ -86,6 +86,8 @@ jobs:
           ./test-mid
           cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-motion tools/test_dos_motion.c src/rd.c
           ./test-motion
+          cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-timing tools/test_dos_timing.c src/rd.c
+          ./test-timing
       - name: Verify every Tandy key and camera horizon movement
         shell: bash
         run: |
@@ -136,11 +138,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Compare identical benchmark cameras with the previous renderer/loop.
+          git fetch --depth=1 origin 231641f085e4f926703bd1b0d95c3e0b61e50fb3
+          git show 231641f085e4f926703bd1b0d95c3e0b61e50fb3:src/rd_faces.c > src/rd_faces_base.c
+          git show 231641f085e4f926703bd1b0d95c3e0b61e50fb3:platforms/dos16/mine.c > platforms/dos16/mine_base.c
+          wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=BASE.EXE platforms/dos16/mine_base.c platforms/dos16/mine_keys.c platforms/dos16/mine_hud.c platforms/dos16/mine_map.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c src/rd_faces_base.c
           sudo apt-get update -qq
           sudo apt-get install -y dosbox
-          printf '[sdl]\nfullscreen=false\n[dosbox]\nmachine=tandy\nmemsize=1\n[cpu]\ncore=normal\ncputype=8086\ncycles=fixed 20000\n[mixer]\nnosound=true\n' > tandy.conf
-          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 180s dosbox -conf tandy.conf -c 'mount c .' -c 'c:' -c 'mine /CAPTURE > CAPTURE.TXT' -c 'mine /MID /BENCH > MID.TXT' -c exit
-          cat CAPTURE.TXT MID.TXT
+          printf '[sdl]\nfullscreen=false\n[dosbox]\nmachine=tandy\nmemsize=1\n[cpu]\ncore=normal\ncputype=auto\ncycles=fixed 20000\n[mixer]\nnosound=true\n' > tandy.conf
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 180s dosbox -conf tandy.conf -c 'mount c .' -c 'c:' -c 'mine /CAPTURE > CAPTURE.TXT' -c 'mine /MID /BENCH > MID.TXT' -c 'base /MID /BENCH > BASE.TXT' -c exit
+          cat CAPTURE.TXT MID.TXT BASE.TXT
           grep -q 'MINE 4 frames' MID.TXT
           cmp HOST.RAW MINE.RAW
           echo 'DOS framebuffer exactly matches host 320x200 preview'

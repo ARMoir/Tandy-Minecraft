@@ -1,4 +1,4 @@
-/* Scan set 1 is used by the Tandy 1000 EX keyboard. E0-prefixed
+/* Tandy EX dedicated arrows differ from IBM keypad arrows. E0-prefixed
  * enhanced-keyboard arrows are accepted too, as are legacy keypad arrows.
  * The DOS IRQ handler is responsible for ACK and PIC EOI.
  */
@@ -9,6 +9,17 @@ void mine_key_feed(mine_keyboard *s,rd_u8 scan) {
     if(scan==0xE1) {s->e1_skip=5;s->e0=0;return;}
     if(scan==0xE0) {s->e0=1;return;}
     code=scan&0x7FU;
+    /* Native 90-key Tandy EX/HX: UP=29 LEFT=2B DOWN=4A RIGHT=4E.
+     * BIOS translates these to IBM arrow codes, but our IRQ reads raw bytes.
+     * Normalize make AND break before latching. Keep IBM/E0 arrows too.
+     * Source: Tandy technical manuals; verified by Adrian Black's adapter:
+     * github.com/misterblack1/ps2-to-tandy1000-keyboard */
+    if(!s->e0) {
+        if(code==0x29)code=0x48;
+        else if(code==0x2B)code=0x4B;
+        else if(code==0x4A)code=0x50;
+        else if(code==0x4E)code=0x4D;
+    }
     s->e0=0;
     if(code>=128)return;
     if(scan&0x80U) s->down[code]=0;

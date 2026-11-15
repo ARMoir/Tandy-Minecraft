@@ -259,7 +259,7 @@ int main(int argc,char **argv) {
             if(!capture)rd_player_set(player,x,y,z,yaw+0.12f,pitch);
         } else {
             rd_player_input(player,&in);
-            for(i=0;i<steps;i++) rd_tick();
+            rd_dos_advance((unsigned)(elapsed>18UL?18UL:elapsed));
         }
         /* A stationary scene needs no redraw. Poll keys/advance physics,
          * then draw only changed camera/world/HUD state. Short taps therefore

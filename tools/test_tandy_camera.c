@@ -44,16 +44,16 @@ int main(void){
     }
     rd_player_set(id,16.5f,12.0f,16.5f,0.0f,0.0f);
     base=horizon(id);
-    tap(0x48,8,id);up=horizon(id);
+    tap(0x29,8,id);up=horizon(id);
     if(up<=base+3){fprintf(stderr,"UP did not move horizon down: base=%d up=%d\n",base,up);return 2;}
-    tap(0x50,8,id);tap(0x50,8,id);
+    tap(0x4A,8,id);tap(0x4A,8,id);
     down=horizon(id);
     if(down>=base-3){fprintf(stderr,"DOWN did not move horizon up: base=%d down=%d\n",base,down);return 3;}
     rd_player_angles(id,&yaw,&pitch);
     if(pitch>=0){puts("DOWN failed to change pitch sign");return 4;}
-    tap(0x4D,5,id);rd_player_angles(id,&yaw,&pitch);
+    tap(0x4E,5,id);rd_player_angles(id,&yaw,&pitch);
     if(yaw<0.45f){puts("RIGHT failed to turn camera");return 5;}
-    tap(0x4B,5,id);rd_player_angles(id,&yaw,&pitch);
+    tap(0x2B,5,id);rd_player_angles(id,&yaw,&pitch);
     if(yaw>0.05f||yaw< -0.05f){puts("LEFT failed to turn back");return 6;}
     printf("PASS: horizon base=%d Up=%d Down=%d and Left/Right yaw=%.2f\n",base,up,down,yaw);
     return 0;

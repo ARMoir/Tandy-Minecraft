@@ -4,6 +4,7 @@
  * No per-pixel ray walks, float math, allocation or depth buffer.
  */
 #include "rd_fast.h"
+#include <string.h>
 #include "rd_face_art.h"
 static const short sintable[256]={
     0, 6, 13, 19, 25, 31, 38, 44, 50, 56, 62, 68, 74, 80, 86, 92,
@@ -35,6 +36,18 @@ static const rd_u8 *blocks;
 static rd_u8 exposed[RD_X*RD_Y*RD_Z];
 static unsigned cached_revision;
 static int cache_ready;
+#define SURFACE_LIMIT 4096
+static unsigned short surface[SURFACE_LIMIT],next_surface[SURFACE_LIMIT];
+static unsigned short heads[RADIUS+1];
+static unsigned surface_count;
+static int surface_overflow;
+/* Shared grid corners are transformed only once per frame, regardless of
+ * how many adjacent block faces use them. Products stay 32-bit until shifted. */
+#define GRID_CORNERS ((RD_X+1)*(RD_Z+1))
+static unsigned short corner_stamp[GRID_CORNERS],frame_stamp;
+static short corner_x[GRID_CORNERS];
+static long corner_y[GRID_CORNERS],corner_z[GRID_CORNERS];
+static long vertical_y[RD_Y+1],vertical_z[RD_Y+1];
 static int voxel(int x,int y,int z) {
     if(x<0||x>=RD_X||y<0||y>=RD_Y||z<0||z>=RD_Z)return RD_AIR;
     return blocks[(y*RD_Z+z)*RD_X+x];
@@ -42,6 +55,7 @@ static int voxel(int x,int y,int z) {
 static void cache_faces(void) {
     int x,y,z;unsigned index=0,revision=rd_world_revision();
     if(cache_ready&&revision==cached_revision)return;
+    surface_count=0;surface_overflow=0;
     for(y=0;y<RD_Y;y++)for(z=0;z<RD_Z;z++)for(x=0;x<RD_X;x++,index++) {
         int bits=0;
         if(blocks[index]!=RD_AIR) {
@@ -53,23 +67,35 @@ static void cache_faces(void) {
             if(!voxel(x,y-1,z))bits|=32;
         }
         exposed[index]=(rd_u8)bits;
+        if(bits) {
+            if(surface_count<SURFACE_LIMIT)surface[surface_count++]=(unsigned short)index;
+            else surface_overflow=1;
+        }
     }
     cached_revision=revision;cache_ready=1;
 }
 static vertex transform(int x,int y,int z,int u,int v) {
     vertex a;
-    int dx=x*256-camx,dy=y*256-camy,dz=z*256-camz;
-    int forward=(int)(((long)dx*sy+(long)dz*cy)>>8);
-    a.x=(int)(((long)dx*cy-(long)dz*sy)>>8);
-    a.y=(int)(((long)dy*cp-(long)forward*sp)>>8);
-    a.z=(int)(((long)forward*cp+(long)dy*sp)>>8);
+    unsigned corner=(unsigned)z*(RD_X+1)+(unsigned)x;
+    if(corner_stamp[corner]!=frame_stamp) {
+        int dx=x*256-camx,dz=z*256-camz;
+        int forward=(int)(((long)dx*sy+(long)dz*cy)>>8);
+        corner_x[corner]=(short)(((long)dx*cy-(long)dz*sy)>>8);
+        corner_y[corner]=(long)forward*sp;
+        corner_z[corner]=(long)forward*cp;
+        corner_stamp[corner]=frame_stamp;
+    }
+    a.x=corner_x[corner];
+    a.y=(int)((vertical_y[y]-corner_y[corner])>>8);
+    a.z=(int)((corner_z[corner]+vertical_z[y])>>8);
     a.u=u;a.v=v;return a;
 }
 /* Clip the face before division. A face crossing the eye must never turn
  * inside out or disappear just because one corner is behind the camera. */
 static void face(vertex *a,int material,int shade) {
     vertex b[6];screen_vertex p[6];
-    int i,j,n=0,lo=fh,hi=-1,y;
+    int i,j,n=0,lo=fh,hi=-1,y,minx=32767,maxx=-32767,flat;
+    const rd_u8 *texture=rd_face_art[material][shade];
     for(i=0;i<4;i++) {
         vertex s=a[i],e=a[(i+1)&3];
         if((s.z>=64)!=(e.z>=64)) {
@@ -87,10 +113,14 @@ static void face(vertex *a,int material,int shade) {
     for(i=0;i<n;i++) {
         p[i].x=fw/2+(int)((long)b[i].x*fx/b[i].z);
         p[i].y=fh/2-(int)((long)b[i].y*fy/b[i].z);
+        if(p[i].x<minx)minx=p[i].x;
+        if(p[i].x>maxx)maxx=p[i].x;
         p[i].u=b[i].u;p[i].v=b[i].v;
         if(p[i].y<lo)lo=p[i].y;
         if(p[i].y>hi)hi=p[i].y;
     }
+    if(maxx<0||minx>=fw)return;
+    flat=(fw<=160&&((maxx-minx)<=4||(hi-lo)<=3));
     if(lo<0)lo=0;if(hi>=fh)hi=fh-1;
     if(lo>hi)return;
     for(y=lo;y<=hi;y++){lx[y]=32767;rx[y]=-32767;}
@@ -104,8 +134,8 @@ static void face(vertex *a,int material,int shade) {
         if(start>end)continue;
         dy=e.y-s.y;
         dx=(long)(e.x-s.x)*256/dy;
-        du=(long)(e.u-s.u)*256/dy;
-        dv=(long)(e.v-s.v)*256/dy;
+        du=flat?0:(long)(e.u-s.u)*256/dy;
+        dv=flat?0:(long)(e.v-s.v)*256/dy;
         x=(long)s.x*256+dx*(start-s.y);
         u=(long)s.u*256+du*(start-s.y);
         v=(long)s.v*256+dv*(start-s.y);
@@ -119,6 +149,11 @@ static void face(vertex *a,int material,int shade) {
         int left=lx[y],right=rx[y],span;
         long u,v,du,dv;unsigned offset;
         if(left>right||right<0||left>=fw)continue;
+        if(flat) {
+            if(left<0)left=0;if(right>=fw)right=fw-1;
+            memset(frame+(unsigned)y*(unsigned)fw+(unsigned)left,texture[136],right-left+1);
+            continue;
+        }
         span=right-left;
         u=lu[y];v=lv[y];
         du=span?(ru[y]-u)/span:0;dv=span?(rv[y]-v)/span:0;
@@ -129,7 +164,7 @@ static void face(vertex *a,int material,int shade) {
             int tu=(int)(u>>16),tv=(int)(v>>16);
             if(tu<0)tu=0;if(tu>15)tu=15;
             if(tv<0)tv=0;if(tv>15)tv=15;
-            frame[offset++]=rd_face_art[material][shade][tv*16+tu];
+            frame[offset++]=texture[tv*16+tu];
         }
     }
 }
@@ -156,6 +191,31 @@ static void quad(int x,int y,int z,int axis,int side,int mat) {
     }
     face(a,mat,shade);
 }
+static void draw_cell(int bx,int by,int bz,int ex,int ey,int ez) {
+    int mat,mask,dx=bx-ex,dz=bz-ez;
+                vertex mid;
+                if(by<0||by>=RD_Y)return;
+                mask=exposed[(by*RD_Z+bz)*RD_X+bx];
+                if(!mask)return;
+                mat=voxel(bx,by,bz);if(mat==RD_AIR||mat>=RD_NUM_BLOCKS)return;
+                /* Buried cubes are the majority: reject them before any
+                 * transforms, projection divisions, or texture access. */
+                if(!((dx>0&&(mask&1))||
+                     (dx<0&&(mask&2))||
+                     (dz>0&&(mask&4))||
+                     (dz<0&&(mask&8))||
+                     (by<ey&&(mask&16))||
+                     (by>ey&&(mask&32))))return;
+                mid=transform(bx,by,bz,0,0);
+                if(mid.z< -448)return;
+                if(mid.x>mid.z+768||mid.x< -mid.z-768)return;
+                if(dx>0&&(mask&1))quad(bx,by,bz,0,0,mat);
+                if(dx<0&&(mask&2))quad(bx,by,bz,0,1,mat);
+                if(dz>0&&(mask&4))quad(bx,by,bz,2,0,mat);
+                if(dz<0&&(mask&8))quad(bx,by,bz,2,1,mat);
+                if(by<ey&&(mask&16))quad(bx,by,bz,1,1,mat);
+                if(by>ey&&(mask&32))quad(bx,by,bz,1,0,mat);
+}
 void rd_faces_render(int id,rd_u8 *image,int width,int height) {
     float x,y,z,yaw,pitch;int ex,ey,ez,phase,ring,dx,dy,dz,sign;
     unsigned k,total;
@@ -170,11 +230,41 @@ void rd_faces_render(int id,rd_u8 *image,int width,int height) {
     sy=sintable[phase];cy=sintable[(phase+64)&255];
     phase=(int)((long)(pitch*40.743665f)&255L);
     sp=sintable[phase];cp=sintable[(phase+64)&255];
+    frame_stamp++;
+    if(!frame_stamp) {
+        for(k=0;k<GRID_CORNERS;k++)corner_stamp[k]=0;
+        frame_stamp=1;
+    }
+    for(k=0;k<=RD_Y;k++) {
+        int dy=(int)k*256-camy;
+        vertical_y[k]=(long)dy*cp;vertical_z[k]=(long)dy*sp;
+    }
     total=(unsigned)width*(unsigned)height;
     for(k=0;k<total;k++)image[k]=11;
     /* Each ray moves monotonically away from the eye in each grid axis.
      * Therefore Manhattan shells give a valid painter order without sorting.
      * Radius is deliberately bounded for an 8088/V20. */
+    if(!surface_overflow) {
+        /* Bucket only exposed cells instead of scanning the entire volume.
+         * Distance ties cannot occlude each other except shared edge pixels. */
+        for(ring=0;ring<=RADIUS;ring++)heads[ring]=65535U;
+        for(k=0;k<surface_count;k++) {
+            unsigned index=surface[k];
+            int bx=index%RD_X,bz=(index/RD_X)%RD_Z,by=index/(RD_X*RD_Z);
+            int dx=bx-ex,dy=by-ey,dz=bz-ez;
+            ring=(dx<0?-dx:dx)+(dy<0?-dy:dy)+(dz<0?-dz:dz);
+            if(ring>RADIUS)continue;
+            next_surface[k]=heads[ring];heads[ring]=(unsigned short)k;
+        }
+        for(ring=RADIUS;ring>=0;ring--) {
+            unsigned node=heads[ring];
+            while(node!=65535U) {
+                unsigned index=surface[node];
+                draw_cell(index%RD_X,index/(RD_X*RD_Z),(index/RD_X)%RD_Z,ex,ey,ez);
+                node=next_surface[node];
+            }
+        }
+    } else
     for(ring=RADIUS;ring>=0;ring--)for(dx=-ring;dx<=ring;dx++) {
         int ax=dx<0?-dx:dx,remain=ring-ax;
         int bx=ex+dx;
@@ -184,29 +274,7 @@ void rd_faces_render(int id,rd_u8 *image,int width,int height) {
             if(bz<0||bz>=RD_Z)continue;
             dy=remain-az;
             for(sign=0;sign<(dy?2:1);sign++) {
-                int by=ey+(sign?-dy:dy),mat,mask;
-                vertex mid;
-                if(by<0||by>=RD_Y)continue;
-                mask=exposed[(by*RD_Z+bz)*RD_X+bx];
-                if(!mask)continue;
-                mat=voxel(bx,by,bz);if(mat==RD_AIR||mat>=RD_NUM_BLOCKS)continue;
-                /* Buried cubes are the majority: reject them before any
-                 * transforms, projection divisions, or texture access. */
-                if(!((dx>0&&(mask&1))||
-                     (dx<0&&(mask&2))||
-                     (dz>0&&(mask&4))||
-                     (dz<0&&(mask&8))||
-                     (by<ey&&(mask&16))||
-                     (by>ey&&(mask&32))))continue;
-                mid=transform(bx,by,bz,0,0);
-                if(mid.z< -448)continue;
-                if(mid.x>mid.z+768||mid.x< -mid.z-768)continue;
-                if(dx>0&&(mask&1))quad(bx,by,bz,0,0,mat);
-                if(dx<0&&(mask&2))quad(bx,by,bz,0,1,mat);
-                if(dz>0&&(mask&4))quad(bx,by,bz,2,0,mat);
-                if(dz<0&&(mask&8))quad(bx,by,bz,2,1,mat);
-                if(by<ey&&(mask&16))quad(bx,by,bz,1,1,mat);
-                if(by>ey&&(mask&32))quad(bx,by,bz,1,0,mat);
+                draw_cell(bx,ey+(sign?-dy:dy),bz,ex,ey,ez);
             }
         }
     }

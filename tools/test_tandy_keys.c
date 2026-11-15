@@ -31,6 +31,15 @@ int main(void){
     event(0xE0);event(0x48);check(6);OK(input.pitch>0.50f);
     event(0xE0);event(0xC8);check(1);OK(!input.pitch);
     event(0x50);event(0xD0);check(1);OK(input.pitch<0);
+    /* Physical Tandy EX arrows, including taps released during a frame. */
+    event(0x29);check(3);OK(input.pitch>0.25f);
+    release(0x29);check(1);OK(!input.pitch);
+    event(0x4A);release(0x4A);check(5);OK(input.pitch<0);
+    check(1);OK(!input.pitch);
+    event(0x2B);check(3);OK(input.yaw< -0.25f);
+    release(0x2B);check(1);OK(!input.yaw);
+    event(0x4E);release(0x4E);check(5);OK(input.yaw>0);
+    check(1);OK(!input.yaw);
     event(0x39);event(0xB9);check(5);OK(input.jump);check(1);OK(!input.jump);
     event(0x21);event(0xA1);check(1);OK(input.dig==1);check(1);OK(!input.dig);
     event(0x12);event(0x92);check(1);OK(input.place==1);

@@ -98,6 +98,7 @@ void rd_relight(void); /* call after writing into rd_blocks() directly */
  */
 enum { RD_ACTION_NONE, RD_ACTION_DUG, RD_ACTION_PLACED,
        RD_ACTION_MISS, RD_ACTION_BLOCKED };
+void rd_dos_advance(unsigned bios_ticks);
 int rd_take_action(int id); /* reads and clears latest gameplay result */
 #endif
 int rd_selected(int id);

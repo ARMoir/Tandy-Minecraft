@@ -39,3 +39,11 @@ Inspired by WolfensteinCGA's offline art conversion, lookup tables, packed
 bulk video writes and timedemo approach. Its wall scalers were not copied:
 Minecraft has variable-height blocks, holes, pitch and changing geometry.
 https://github.com/jhhoward/WolfensteinCGA
+
+INPUT AND SPEED CORRECTION
+Native EX/HX arrows (29/2B/4A/4E) are normalized before the IRQ latch.
+IBM/E0 arrows remain supported. Walking uses elapsed BIOS time, not four
+60Hz ticks per rendered frame. Swept collisions still prevent wall tunneling.
+The renderer buckets exposed blocks, reuses shared transformed corners, and
+uses solid material shading only for tiny distant faces at LOW/MID/DETAIL.
+MAX retains full texturing. Physical V20 performance still requires testing.

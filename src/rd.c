@@ -535,6 +535,9 @@ static int box_hits_players(int x, int y, int z) {
     return 0;
 }
 
+#ifdef RD_DOS16
+static float dos_frame_scale; /* zero preserves the original rd_tick contract */
+#endif
 static void tick_player(player *p) {
     rd_input *in = &p->in;
     p->yaw += in->yaw;
@@ -542,6 +545,23 @@ static void tick_player(player *p) {
     if (in->select > 0 && in->select < RD_NUM_BLOCKS) p->selected = in->select;
     if (in->reset || p->y < -64) respawn(p);
 
+#ifdef RD_DOS16
+    if(dos_frame_scale>0) {
+        float xa=in->strafe,za=in->forward,dist=xa*xa+za*za;
+        float dx=0,dz=0;
+        if(in->jump&&p->on_ground)p->yd=0.12f;
+        if(dist>=0.01f) {
+            float speed=0.05f*dos_frame_scale/sqrt_(dist);
+            float sy=sin_(p->yaw),cy=cos_(p->yaw);
+            dx=(xa*cy+za*sy)*speed;dz=(za*cy-xa*sy)*speed;
+        }
+        p->yd-=0.005f*dos_frame_scale;
+        if(p->yd< -0.3f)p->yd=-0.3f;
+        move(p,dx,p->yd*dos_frame_scale,dz);
+        p->xd=p->zd=0; /* release stops walking; no frame-rate-dependent inertia */
+    } else
+#endif
+    {
     /* Player.tick from rd-132211, at its 60 Hz timer. */
     if (in->jump && p->on_ground) p->yd = 0.12f;
     float xa = in->strafe, za = in->forward;
@@ -565,6 +585,7 @@ static void tick_player(player *p) {
     move(p, p->xd, p->yd, p->zd);
     p->xd *= 0.91f, p->yd *= 0.98f, p->zd *= 0.91f;
     if (p->on_ground) p->xd *= 0.8f, p->zd *= 0.8f;
+    }
 
 #ifdef RD_DOS16
     /* The old code performs a software-floating voxel raycast on EVERY
@@ -606,6 +627,19 @@ void rd_tick(void) {
     for (int i = 0; i < RD_MAX_PLAYERS; i++)
         if (players[i].active) tick_player(&players[i]);
 }
+
+#ifdef RD_DOS16
+/* BIOS ticks, ~18.2 Hz. At most four swept collision substeps. One second
+ * maximum catch-up prevents a long pause teleporting the player. */
+void rd_dos_advance(unsigned ticks) {
+    int i,n;
+    if(ticks<1)ticks=1;if(ticks>18)ticks=18;
+    n=ticks>4?4:(int)ticks;
+    dos_frame_scale=(float)ticks*(60.0f/18.2f)/(float)n;
+    for(i=0;i<n;i++)rd_tick();
+    dos_frame_scale=0;
+}
+#endif
 
 #ifndef RD_DOS16
 /* ---- drawing ---- */
