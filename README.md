@@ -160,7 +160,7 @@ tests/run.sh              builds everything and checks each target
 
 ## MINE.EXE: Tandy 1000 EX / V20
 
-> **Experimental proof of concept, not a playable 3D Minecraft port on the tested hardware.** We achieved recognizable Tandy 16-color Minecraft graphics, but the best-looking renderer was much too slow. The later hybrid ran faster but looked substantially worse. Our **2 FPS minimum was not reached**, and active optimization for unrestricted V20 3D has been paused.
+> **Experimental proof of concept, not a playable graphical Minecraft port on the tested hardware.** We achieved recognizable Tandy 16-color graphics, but the best-looking graphical renderer was much too slow. A separate text-mode 3D raycaster is now available for testing. The later hybrid ran faster but looked substantially worse. Our **2 FPS minimum was not reached**, and active optimization for unrestricted V20 3D has been paused.
 
 This fork ports the early `rdgeneric` / rd-132211-inspired C voxel world to a **Tandy 1000 EX with a 7 MHz NEC V20**, DOS and native 16-color Tandy graphics. Open Watcom produces a real-mode 16-bit, 8086-compatible executable, `MINE.EXE`. It is not a port of modern Java Minecraft. The DOS world is 32×24×32 blocks.
 
@@ -265,6 +265,21 @@ Normal gameplay reads and writes the raw `MINE.WLD` file in the current director
 - [DOS workflow](.github/workflows/mine-dos.yml): Open Watcom build, host and DOSBox tests, render previews, release packaging and release cleanup.
 
 Only **`main`** is used for development. The Actions workflow rebuilds on every commit, publishes a new ZIP, and **deletes earlier releases and tags** after a successful publish. Always use the [latest release page](https://github.com/ARMoir/Tandy-Minecraft/releases/latest); prior source **commits remain in Git history** even when their packaged releases are removed. The graphics of the visual milestone are available through `/FACES /MAX` in current releases.
+
+### Experimental true 3D ASCII/text-mode raycaster (new)
+
+The latest DOS build also offers a **real voxel ray sampler in native 80×25 color text mode**. This is not another 2.5D heightfield: each camera sample steps through the actual 3D world, so walls, trees, holes, ceilings and edited blocks are represented by **CP437 shade characters** (`░▒▓█`) and material colors. The original 32×24×32 world, physics, controls and `MINE.WLD` are reused.
+
+| Command | Ray budget | Video mode |
+| --- | ---: | --- |
+| `MINE.EXE /ASCIILOW` | 20×10 rays | 80×25 text (03h) |
+| **`MINE.EXE /ASCII`** | **32×16 rays** | **80×25 text (03h)** |
+| `MINE.EXE /ASCIIHI` | 40×20 rays | 80×25 text (03h) |
+| `MINE.EXE /ASCII /BENCH` | Four automatic camera frames | Prints setup/render/video BIOS ticks and FPS |
+
+The ray loop uses only 16-bit fixed-point coordinate updates, at most **28 half-block steps per ray**, precomputed sine and per-frame camera direction tables; no polygon pipeline, graphical textures or per-pixel floating-point math. Text mode uses a **4 KB B800h character/attribute framebuffer** and updates changed cells only. Aiming crosshair, colored material shading, compass, arrow/WASD, DIG/PUT/MISS/BLOCK feedback and the original keyboard controls remain available. Press **H** to cycle text-ray quality while playing.
+
+**Performance is unverified on the physical Tandy until tested.** This is an independent, low-resource attempt after the full-graphics failure. DOSBox success is a correctness test, not evidence of 2 FPS on the 7 MHz V20. The visually best full-face renderer is still accessible with `MINE.EXE /FACES /MAX`, while `MINE.EXE /ART` remains the static graphics showcase.
 
 ### Conclusion
 

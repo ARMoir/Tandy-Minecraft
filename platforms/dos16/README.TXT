@@ -52,3 +52,22 @@ The original /FACES and higher detail modes still use mode 09h.
 Changing detail with H automatically changes video mode and invalidates
 the scanline cache. Near-field face radius is shortened to prioritize the
 first 4-6 blocks in front of the player, with distant scenery behind them.
+
+TEXT-MODE TRUE VOXEL RAYCAST EXPERIMENT:
+  MINE /ASCII             32x16 true 3D voxel ray samples; 80x25 color text.
+  MINE /ASCIILOW          20x10 rays for maximum V20 throughput.
+  MINE /ASCIIHI           40x20 rays for more recognizable details.
+  MINE /ASCII /BENCH      Four fixed camera frames and CPU/video timing.
+  MINE /ASCII /LOW        Same performance setting as /ASCIILOW.
+  H while playing         Cycle 20x10 -> 32x16 -> 40x20 samples.
+
+Unlike the older /TERRAIN heightfield, text-mode rays query the actual
+3D Minecraft voxels, including walls, holes, trees and vertical layers.
+CGA/Tandy 80x25 BIOS text mode 03h (B800h) uses only 4000 display bytes,
+foreground/background 16-color attributes, and CP437 shading glyphs.
+The renderer avoids polygons, texture UV interpolation, graphical scanline
+packing, and any floating-point arithmetic inside the ray loop. Short
+16-bit fixed-point steps are used for 3D block traversal; 28 steps/ray max.
+Only changed character+attribute cells are sent to video RAM.
+All old graphic modes including /FACES /MAX and /ART remain available.
+ASCII FPS must still be measured on a physical V20; DOSBox is not proof.

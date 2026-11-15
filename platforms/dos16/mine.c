@@ -9,6 +9,7 @@
 #include <conio.h>
 #include "../../src/rd.h"
 #include "../../src/rd_fast.h"
+#include "../../src/rd_ascii.h"
 #include "mine_keys.h"
 #include "mine_hud.h"
 #include "mine_map.h"
@@ -22,10 +23,31 @@
 static rd_u8 indexed[64000UL];
 static rd_u8 packed[SCREEN_WIDTH_BYTES * RENDER_MAX_H];
 static int video_valid;
+static int text_valid;
+static rd_u8 text_frame[RD_ASCII_FRAME_BYTES];
+static rd_u8 text_cache[RD_ASCII_FRAME_BYTES];
 static mine_keyboard keyboard;
 static mine_snapshot snapshot;
 static void (__interrupt __far *previous_irq1)(void);
 
+/* Text-mode display: each CP437 glyph and color attribute is written only
+ * when it changes. 80x25x2 bytes, no graphics scan conversion or palette
+ * packing. Use B800h directly, not printf or ANSI escape sequences.
+ */
+static void render_text_screen(void) {
+    rd_u8 __far *video=(rd_u8 __far *)MK_FP(0xB800,0);
+    unsigned i;
+    for(i=0;i<RD_ASCII_FRAME_BYTES;i+=2) {
+        if(!text_valid||text_frame[i]!=text_cache[i]||
+           text_frame[i+1]!=text_cache[i+1]){
+            video[i]=text_frame[i];
+            video[i+1]=text_frame[i+1];
+            text_cache[i]=text_frame[i];
+            text_cache[i+1]=text_frame[i+1];
+        }
+    }
+    text_valid=1;
+}
 static void mode_set(unsigned mode) {
     union REGS r;
     r.h.ah=0;
@@ -211,7 +233,7 @@ static void save_world(void) {
 }
 
 int main(int argc,char **argv) {
-    int quality=0,auto_quality=0,auto_frames=0,bench=0,render_mode=4,keytest=0,capture=0,player,frames=0,i,steps;
+    int quality=0,ascii_quality=1,auto_quality=0,auto_frames=0,bench=0,render_mode=4,keytest=0,capture=0,player,frames=0,i,steps;
     int hud_action=RD_ACTION_NONE,hud_action_frames=0,hud_direction=MINE_DIR_NONE,hud_direction_frames=0;
     unsigned previous_mode,current_video_mode,last_revision=0;
     int last_w=0,last_h=0,have_frame=0,last_hud=0;
@@ -223,11 +245,11 @@ int main(int argc,char **argv) {
     for(i=1;i<argc;i++) {
         if(!strcmp(argv[i],"/CAPTURE")) {capture=1;bench=1;quality=3;auto_quality=0;render_mode=3;}
         if(!strcmp(argv[i],"/ART") || !strcmp(argv[i],"/art")) return show_art();
-        if(!strcmp(argv[i],"/MAX") || !strcmp(argv[i],"/max")) {quality=3;auto_quality=0;}
+        if(!strcmp(argv[i],"/MAX") || !strcmp(argv[i],"/max")) {quality=3;ascii_quality=2;auto_quality=0;}
         if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) {quality=3;auto_quality=0;}
-        if(!strcmp(argv[i],"/LOW") || !strcmp(argv[i],"/low")) {quality=0;auto_quality=0;}
-        if(!strcmp(argv[i],"/DETAIL") || !strcmp(argv[i],"/detail")) {quality=2;auto_quality=0;}
-        if(!strcmp(argv[i],"/MID") || !strcmp(argv[i],"/mid")) {quality=1;auto_quality=0;}
+        if(!strcmp(argv[i],"/LOW") || !strcmp(argv[i],"/low")) {quality=0;ascii_quality=0;auto_quality=0;}
+        if(!strcmp(argv[i],"/DETAIL") || !strcmp(argv[i],"/detail")) {quality=2;ascii_quality=2;auto_quality=0;}
+        if(!strcmp(argv[i],"/MID") || !strcmp(argv[i],"/mid")) {quality=1;ascii_quality=1;auto_quality=0;}
         if(!strcmp(argv[i],"/KEYTEST") || !strcmp(argv[i],"/keytest")) keytest=1;
         if(!strcmp(argv[i],"/AUTO") || !strcmp(argv[i],"/auto")) {quality=1;auto_quality=1;}
         if(!strcmp(argv[i],"/BENCH") || !strcmp(argv[i],"/bench")) bench=1;
@@ -236,6 +258,9 @@ int main(int argc,char **argv) {
         if(!strcmp(argv[i],"/HYBRID") || !strcmp(argv[i],"/hybrid")) render_mode=4;
         if(!strcmp(argv[i],"/FULL") || !strcmp(argv[i],"/full")) render_mode=1;
         if(!strcmp(argv[i],"/TERRAIN") || !strcmp(argv[i],"/terrain")) render_mode=0;
+        if(!strcmp(argv[i],"/ASCII") || !strcmp(argv[i],"/ascii")) render_mode=5;
+        if(!strcmp(argv[i],"/ASCIILOW") || !strcmp(argv[i],"/asciilow")) {render_mode=5;ascii_quality=0;}
+        if(!strcmp(argv[i],"/ASCIIHI") || !strcmp(argv[i],"/asciihi")) {render_mode=5;ascii_quality=2;}
     }
     printf("MINE - Minecraft for Tandy 1000 EX / V20\n");
     printf("World: 32x24x32, video: Tandy 320x200 16 colors.\n");
@@ -244,6 +269,7 @@ int main(int argc,char **argv) {
     printf("HUD: DIG/PUT=world changed; MISS=no target; BLOCK=can't place.\n");
     printf("Map: bottom-right, white=you, yellow=facing; /LOW hides map.\n");
     printf("Default HYBRID: textured cubes near, cached far scenery.\n");
+    printf("/ASCII 32x16 real 3D TEXT; /ASCIILOW 20x10; /ASCIIHI 40x20.\n");
     printf("/LOW 80x50; /MID 80x100; /FACES original full-3D; /ART picture.\n");
     if(keytest) puts("KEYTEST rows: W A S D LEFT RIGHT UP DOWN. Green=held, pink=tapped.");
     setup_start=timer_ticks();
@@ -258,14 +284,16 @@ int main(int argc,char **argv) {
     printf("World ready after %lu timer ticks (about %lu seconds).\n",
            setup_ticks,setup_ticks/18UL);
     previous_mode=mode_get();
-    current_video_mode=(render_mode==4 && quality<=1 && !keytest)?0x08:0x09;
+    current_video_mode=(render_mode==5 && !keytest)?0x03:
+                       (render_mode==4 && quality<=1 && !keytest)?0x08:0x09;
     mode_set(current_video_mode);
     if(mode_get()!=current_video_mode) {
         mode_set(previous_mode);
         puts("Requested Tandy graphics mode unavailable.");
         return 1;
     }
-    draw_startup(current_video_mode);
+    if(current_video_mode!=0x03)draw_startup(current_video_mode);
+    else puts("Native 80x25 COLOR TEXT: character raytracing, no graphics framebuffer.");
     printf("Tandy video mode %02Xh active.\n",current_video_mode);
     previous_irq1=_dos_getvect(0x09);
     _dos_setvect(0x09,mine_irq1);
@@ -282,17 +310,21 @@ int main(int argc,char **argv) {
     began=last=auto_since=timer_ticks();
     while(!keyboard.down[0x01] && !keyboard.down[0x10] &&
           !keyboard.edge[0x01] && !keyboard.edge[0x10]) {
-        int w=(render_mode==3)?(quality==3?320:(quality==0?80:160)):
+        int w=(render_mode==5)?80:
+              (render_mode==3)?(quality==3?320:(quality==0?80:160)):
               (render_mode==4)?(quality>=2?160:80):
                                (quality==3?80:(quality==0?20:40));
-        int h=(render_mode==3)?(quality>=2?200:100):
+        int h=(render_mode==5)?25:
+              (render_mode==3)?(quality>=2?200:100):
               (render_mode==4)?(quality==0?50:(quality==3?200:100)):
                                (quality==0?25:(quality==1?40:50));
-        unsigned desired_mode=(render_mode==4 && quality<=1)?0x08:0x09;
+        unsigned desired_mode=(render_mode==5)?0x03:
+                              (render_mode==4 && quality<=1)?0x08:0x09;
         if(current_video_mode!=desired_mode) {
             mode_set(desired_mode);
             current_video_mode=desired_mode;
-            video_valid=0; /* Different layout: old scanline cache invalid. */
+            video_valid=0;
+            text_valid=0; /* BIOS mode change invalidates either cached image. */
         }
         now=timer_ticks();
         elapsed=now-last;
@@ -308,7 +340,11 @@ int main(int argc,char **argv) {
         sample_keys();
         mine_key_controls(&snapshot,elapsed,&in,&commands);
         if(commands.quit) break;
-        if(commands.quality_cycle) {quality=(quality+1)%4;auto_quality=0;}
+        if(commands.quality_cycle) {
+            if(render_mode==5)ascii_quality=(ascii_quality+1)%3;
+            else quality=(quality+1)%4;
+            auto_quality=0;have_frame=0;
+        }
         /* Report ALL arrow keys and WASD even if view changes are subtle.
          * Give short presses time to remain visible at ~1 FPS.
          */
@@ -353,7 +389,10 @@ int main(int argc,char **argv) {
         else if(render_mode==1)rd_fast_render(player,indexed,w,h);
         else if(render_mode==0)rd_terrain_render(player,indexed,w,h);
         else if(render_mode==3)rd_faces_render(player,indexed,w,h);
-        else rd_hybrid_render(player,indexed,w,h);
+        else if(render_mode==4)rd_hybrid_render(player,indexed,w,h);
+        else rd_ascii_render(player,text_frame,
+             ascii_quality==0?20:(ascii_quality==1?32:40),
+             ascii_quality==0?10:(ascii_quality==1?16:20));
         /* Actual core mutation result, never merely a claimed key press. */
         if(!bench) {
             int result=rd_take_action(player);
@@ -362,14 +401,43 @@ int main(int argc,char **argv) {
             /* Minimap visualizes BOTH strafing and turning in real world
              * coordinates. Hidden in /LOW to preserve the tiny view.
              */
-            mine_map_draw(player,indexed,w,h);
-            mine_hud_draw(indexed,w,h,hud_action,hud_action_frames,
-                          hud_direction,hud_direction_frames);
+            if(render_mode==5) {
+                const char *action_name="";
+                const char *direction_name="";
+                rd_u8 action_ink=0x0A;
+                if(hud_action_frames>0){
+                    switch(hud_action) {
+                        case RD_ACTION_DUG:action_name="DIG";break;
+                        case RD_ACTION_PLACED:action_name="PUT";break;
+                        case RD_ACTION_MISS:action_name="MISS";action_ink=0x0C;break;
+                        case RD_ACTION_BLOCKED:action_name="BLOCK";action_ink=0x0C;break;
+                    }
+                    rd_ascii_write(text_frame,56,23,action_name,action_ink);
+                }
+                if(hud_direction_frames>0){
+                    switch(hud_direction) {
+                        case MINE_DIR_UP:direction_name="UP";break;
+                        case MINE_DIR_DOWN:direction_name="DOWN";break;
+                        case MINE_DIR_LEFT:direction_name="LEFT";break;
+                        case MINE_DIR_RIGHT:direction_name="RIGHT";break;
+                        case MINE_DIR_W:direction_name="W";break;
+                        case MINE_DIR_A:direction_name="A";break;
+                        case MINE_DIR_S:direction_name="S";break;
+                        case MINE_DIR_D:direction_name="D";break;
+                    }
+                    rd_ascii_write(text_frame,65,23,direction_name,0x0E);
+                }
+            } else {
+                mine_map_draw(player,indexed,w,h);
+                mine_hud_draw(indexed,w,h,hud_action,hud_action_frames,
+                              hud_direction,hud_direction_frames);
+            }
         }
         last_hud=(hud_action_frames>0||hud_direction_frames>0);
         render_ticks+=timer_ticks()-measured;
         measured=timer_ticks();
-        if(current_video_mode==0x08)render_screen_08(w,h);
+        if(current_video_mode==0x03)render_text_screen();
+        else if(current_video_mode==0x08)render_screen_08(w,h);
         else render_screen(w,h);
         video_ticks+=timer_ticks()-measured;
         frames++;
