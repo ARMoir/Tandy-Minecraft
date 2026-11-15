@@ -11,6 +11,7 @@
 #include "../../src/rd_fast.h"
 #include "mine_keys.h"
 #include "mine_hud.h"
+#include "mine_map.h"
 
 #define SCREEN_WIDTH_BYTES 80
 #define RENDER_MAX_W 80
@@ -160,6 +161,7 @@ int main(int argc,char **argv) {
     printf("WASD move, arrows LEFT/RIGHT turn UP/DOWN look, SPACE jump.\n");
     printf("F dig, E place, 1-7 blocks, R reset view, H detail, ESC/Q exit.\n");
     printf("HUD: DIG/PUT=world changed; MISS=no target; BLOCK=can't place.\n");
+    printf("Map: bottom-right, white=you, yellow=facing; /LOW hides map.\n");
     printf("ESC/Q quit, H detail, /MID 40x40, /DETAIL 40x50, /KEYTEST.\n");
     if(keytest) puts("KEYTEST rows: W A S D LEFT RIGHT UP DOWN. Green=held, pink=tapped.");
     setup_start=timer_ticks();
@@ -244,6 +246,10 @@ int main(int argc,char **argv) {
             int result=rd_take_action(player);
             if(result!=RD_ACTION_NONE){hud_action=result;hud_action_frames=8;}
             else if(hud_action_frames>0)hud_action_frames--;
+            /* Minimap visualizes BOTH strafing and turning in real world
+             * coordinates. Hidden in /LOW to preserve the tiny view.
+             */
+            mine_map_draw(player,indexed,w,h);
             mine_hud_draw(indexed,w,h,hud_action,hud_action_frames,
                           hud_direction,hud_direction_frames);
         }

@@ -283,3 +283,11 @@ every cave/side/underground edit; a successful mutation may be invisible in
 the landscape, hence the separate core-driven feedback. New tests construct
 a flat world, prove F and E actually change voxel counts, and verify that
 all three internal viewport sizes display the HUD without overflow.
+
+### DOS orientation minimap
+The game now displays a compact 11×11 true top-down map at the lower right
+of normal and high-quality gameplay views. White = player position, yellow =
+facing direction, green/brown/grey = world material. Unlike the simplified
+landscape renderer, this maps actual voxels, making movement and turning easy
+to verify even at 1–2 FPS. The map costs only 121 direct block lookups per
+frame, no raycast; it is omitted in `/LOW` for maximum visibility.

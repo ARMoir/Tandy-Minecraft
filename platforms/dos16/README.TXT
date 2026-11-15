@@ -151,3 +151,11 @@ after an edit, including when the simplified terrain view cannot show a
 sideways/underground edit. They are driven by real gameplay results,
 not just whether a key was pressed. Lowered world editing is still voxel-
 based and /FULL displays more faces, but that view is significantly slower.
+
+TOP-DOWN MINIMAP:
+- Lower right of /MID, /DETAIL and /HI: 11x11 nearby terrain blocks.
+- White dot in center = player, yellow adjacent dot = facing direction.
+- Green = grass/trees, brown = wood/dirt, grey = stone, cyan = empty.
+- WASD shifts terrain relative to center, arrows rotate yellow marker.
+- Dig/place edits that alter the top block appear on the map immediately.
+- /LOW omits the map to avoid covering the 20-pixel-wide screen.
