@@ -328,7 +328,10 @@ static void faces_scene(int id,rd_u8 *image,int width,int height,int near_only) 
      * The far scene is provided by the cached heightfield approximation.
      * Full /FACES retains the prior radius and the original scene.
      */
-    render_radius=near_only?(width<=80?(height<=50?6:8):10):
+    /* Focus high-detail cubes on the immediate build/mining range.
+     * Far scenery has its own layer, so full-radius faces are unnecessary.
+     */
+    render_radius=near_only?(width<=80?(height<=50?5:6):8):
                              (width<=80?11:(width<=160?17:28));
     cache_faces();
     fx=width*5/7;fy=height*20/21; /* 4:3 CRT aspect, ~70 degree horizontal FOV */

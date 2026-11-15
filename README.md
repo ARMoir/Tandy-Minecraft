@@ -239,3 +239,12 @@ to compare the unmodified full-distance Build #30 renderer. The original
 voxel world, keyboard handling, mining/placing, and saves remain intact.
 The pass/fail target is **2 FPS on the physical 7 MHz V20**; DOSBox numbers
 are only an automated relative-performance sanity check.
+
+#### Mode-08h framebuffer optimization for real V20
+The 80-column hybrid modes now display through **Tandy 160×200×16 mode 08h**,
+transferring up to **16 KB/frame** instead of 32 KB/frame in mode 09h.
+This preserves every unique logical horizontal pixel of the 80×50/80×100
+hybrid view (each already expands 2× in mode 08h) while halving VRAM writes
+and reducing changes to the screen cache. Higher-resolution hybrid modes,
+`/FACES`, and `/ART` continue using 320×200 mode 09h. Detail switching
+changes BIOS mode safely; the previous mode is restored on exit.

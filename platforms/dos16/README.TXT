@@ -43,3 +43,12 @@ LIMITATIONS:
 
 Recommended test: MINE /LOW /BENCH, then MINE /MID /BENCH,
 followed by MINE /LOW for gameplay responsiveness.
+
+FAST NATIVE VIDEO MODE:
+The /LOW and /MID HYBRID paths now use Tandy BIOS video mode 08h,
+160x200x16, without losing any of their 80 unique horizontal pixels.
+This halves the physical framebuffer transfer versus 320x200 mode 09h.
+The original /FACES and higher detail modes still use mode 09h.
+Changing detail with H automatically changes video mode and invalidates
+the scanline cache. Near-field face radius is shortened to prioritize the
+first 4-6 blocks in front of the player, with distant scenery behind them.

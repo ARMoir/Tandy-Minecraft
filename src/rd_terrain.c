@@ -153,7 +153,7 @@ static void terrain_core(int id,rd_u8 *image,int width,int height,int far_only) 
         int vz=cs-(int)(((long)sn*angle)>>8);
         int prevx=-1,prevz=-1,prevground=-1;
         int clip=height,face_x=abs_int(vx)>abs_int(vz);
-        for(depth=far_only?9:0;depth<TERRAIN_STEPS;depth++){
+        for(depth=far_only?6:0;depth<TERRAIN_STEPS;depth++){
             unsigned dist=(unsigned)(256+depth*128);
             int x=ox+(int)(((long)vx*(long)dist)>>8);
             int z=oz+(int)(((long)vz*(long)dist)>>8);

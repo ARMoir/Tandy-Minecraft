@@ -42,14 +42,50 @@ static unsigned mode_get(void) {
 /* Show a test pattern immediately, before the first ray is traced.
  * If the user sees this, the Tandy BIOS mode switch and B800 write worked.
  */
-static void draw_startup(void) {
+static void draw_startup(unsigned mode) {
     rd_u8 __far *video=(rd_u8 __far *)MK_FP(0xB800,0);
     int y,x;
     for(y=0;y<200;y++) {
-        unsigned base=(unsigned)((unsigned)y&3U)*8192U+((unsigned)y/4)*160U;
+        unsigned base;
+        int bytes;
         rd_u8 c=(rd_u8)(y<30?0x11:(y<50?0x33:(y<65?0xAA:0x00)));
-        for(x=0;x<160;x++) video[base+(unsigned)x]=c;
+        if(mode==0x08) {
+            /* Tandy 160x200x16, even lines in B800, odd in BA00. */
+            base=(unsigned)(y&1)*8192U+(unsigned)(y>>1)*80U;
+            bytes=80;
+        } else {
+            /* Tandy 320x200x16, four 8 KB banks. */
+            base=(unsigned)(y&3)*8192U+(unsigned)(y>>2)*160U;
+            bytes=160;
+        }
+        for(x=0;x<bytes;x++)video[base+(unsigned)x]=c;
     }
+}
+/* Mode 08h 160x200x16: 80 bytes/row, two 8 KB banks.
+ * At 80 logical columns, each pixel becomes one 4-bit pair. The physical
+ * display still fills the CRT, but video traffic is HALF that of mode 09h.
+ * Original host/image palette and framebuffers are unchanged.
+ */
+static void render_screen_08(int w,int h) {
+    rd_u8 row[80];
+    rd_u8 __far *video=(rd_u8 __far *)MK_FP(0xB800,0);
+    int sy,x,r,lines=200/h;
+    if(w!=80)return;
+    for(sy=0;sy<h;sy++) {
+        unsigned input=(unsigned)sy*80U;
+        for(x=0;x<80;x++) {
+            rd_u8 ink=indexed[input+(unsigned)x]&15;
+            row[x]=(rd_u8)((ink<<4)|ink);
+        }
+        for(r=0;r<lines;r++) {
+            unsigned y=(unsigned)(sy*lines+r),offset=y*80U;
+            if(!video_valid||memcmp(packed+offset,row,80)!=0) {
+                memcpy(packed+offset,row,80);
+                _fmemcpy(video+(y&1U)*8192U+(y>>1)*80U,row,80);
+            }
+        }
+    }
+    video_valid=1;
 }
 /* Mode 09h: 320x200x16, four 8KB banks, two distinct pixels per byte.
  * Pack once per logical row, replicate with bulk copies, skip unchanged rows.
@@ -177,7 +213,7 @@ static void save_world(void) {
 int main(int argc,char **argv) {
     int quality=0,auto_quality=0,auto_frames=0,bench=0,render_mode=4,keytest=0,capture=0,player,frames=0,i,steps;
     int hud_action=RD_ACTION_NONE,hud_action_frames=0,hud_direction=MINE_DIR_NONE,hud_direction_frames=0;
-    unsigned previous_mode,last_revision=0;
+    unsigned previous_mode,current_video_mode,last_revision=0;
     int last_w=0,last_h=0,have_frame=0,last_hud=0;
     float last_x=0,last_y=0,last_z=0,last_yaw=0,last_pitch=0;
     unsigned long began,last,now,elapsed,fps10,auto_since,setup_start,setup_ticks;
@@ -222,13 +258,15 @@ int main(int argc,char **argv) {
     printf("World ready after %lu timer ticks (about %lu seconds).\n",
            setup_ticks,setup_ticks/18UL);
     previous_mode=mode_get();
-    mode_set(0x09);
-    if(mode_get()!=0x09) {
+    current_video_mode=(render_mode==4 && quality<=1 && !keytest)?0x08:0x09;
+    mode_set(current_video_mode);
+    if(mode_get()!=current_video_mode) {
         mode_set(previous_mode);
-        puts("Tandy/PCjr BIOS mode 09h unavailable. MINE requires Tandy graphics.");
+        puts("Requested Tandy graphics mode unavailable.");
         return 1;
     }
-    draw_startup();
+    draw_startup(current_video_mode);
+    printf("Tandy video mode %02Xh active.\n",current_video_mode);
     previous_irq1=_dos_getvect(0x09);
     _dos_setvect(0x09,mine_irq1);
     if(keytest) {
@@ -250,6 +288,12 @@ int main(int argc,char **argv) {
         int h=(render_mode==3)?(quality>=2?200:100):
               (render_mode==4)?(quality==0?50:(quality==3?200:100)):
                                (quality==0?25:(quality==1?40:50));
+        unsigned desired_mode=(render_mode==4 && quality<=1)?0x08:0x09;
+        if(current_video_mode!=desired_mode) {
+            mode_set(desired_mode);
+            current_video_mode=desired_mode;
+            video_valid=0; /* Different layout: old scanline cache invalid. */
+        }
         now=timer_ticks();
         elapsed=now-last;
         if(!elapsed&&have_frame&&!bench)continue;
@@ -325,7 +369,8 @@ int main(int argc,char **argv) {
         last_hud=(hud_action_frames>0||hud_direction_frames>0);
         render_ticks+=timer_ticks()-measured;
         measured=timer_ticks();
-        render_screen(w,h);
+        if(current_video_mode==0x08)render_screen_08(w,h);
+        else render_screen(w,h);
         video_ticks+=timer_ticks()-measured;
         frames++;
         if(capture) {
