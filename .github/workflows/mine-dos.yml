@@ -112,7 +112,7 @@ jobs:
           set -euo pipefail
           cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-actions tools/test_dos_actions.c src/rd.c
           ./test-actions
-          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-hud tools/test_tandy_hud.c platforms/dos16/mine_hud.c
+          cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-hud tools/test_tandy_hud.c platforms/dos16/mine_hud.c
           ./test-hud
       - name: Upload DOS build
         uses: actions/upload-artifact@v4
