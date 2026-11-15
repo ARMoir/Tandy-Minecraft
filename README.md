@@ -245,3 +245,15 @@ A tiny compass at the top-right makes rotation recognizable.
 The DOS-only respawn now starts at the centered world location facing
 inward, rather than near a random world edge. Other platforms keep the
 original spawn behavior.
+
+### Material-aware Tandy textures (clarity fix)
+A major cause of the scrambled terrain was the build-host RGB-to-Tandy
+converter: Euclidean palette matching mapped green grass to grey because
+EGA gray was numerically closer to the original muted grassy green.
+`tools/make_tandy_atlas.c` now uses the **original rdgeneric face texture
+and grain** with constrained material palettes: grass/leaves in Tandy greens,
+dirt/wood browns and rock grays. Leaves keep their transparent holes.
+Ground coordinates are calmer and the spurious purple horizon stripe is
+removed. Automated tests validate palette identity and actual terrain pixel
+distribution as well as camera/physics behavior. No per-frame RGB work was
+added to the V20.

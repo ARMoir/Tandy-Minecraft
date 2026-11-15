@@ -4,27 +4,46 @@
  */
 #include <stdio.h>
 #include "../src/rd.c"
-static const unsigned char palette[16][3]={
- {0,0,0},{0,0,170},{0,170,0},{0,170,170},
- {170,0,0},{170,0,170},{170,85,0},{170,170,170},
- {85,85,85},{85,85,255},{85,255,85},{85,255,255},
- {255,85,85},{255,85,255},{255,255,85},{255,255,255}
+/* Palette choices are material-aware. Naive nearest-RGB causes the
+ * very characteristic original grass green (98,168,63) to quantize to
+ * EGA grey (85,85,85)! On a 40x40 Tandy image that looks like visual noise.
+ *
+ * Source rdgeneric texture RGB still supplies hue/brightness, seams,
+ * transparency and grain. Only the OUTPUT COLOR FAMILY is constrained:
+ * grass/leaves green, dirt/logs brown, rock grey, planks wood/yellow.
+ *
+ * 2/10 = green, 6 = brown, 7/8 = grey, 14 = yellow, 16 = transparent.
+ * This is precomputed by Actions: no palette math executes on the V20.
+ */
+static const unsigned char bayer[16]={
+    0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5
 };
-static const unsigned char bayer[16]={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
-static int clamp(int a){return a<0?0:a>255?255:a;}
-static int nearest(rd_u32 color,int x,int y){
-    int r,g,b,best=0,i,dr,dg,db,offset;
-    long error,closest=0x7fffffffL;
-    offset=((int)bayer[(y&3)*4+(x&3)]-8)*3;
-    r=clamp((int)((color>>16)&255U)+offset);
-    g=clamp((int)((color>>8)&255U)+offset);
-    b=clamp((int)(color&255U)+offset);
-    for(i=0;i<16;i++) {
-        dr=r-palette[i][0];dg=g-palette[i][1];db=b-palette[i][2];
-        error=(long)dr*dr+(long)dg*dg+(long)db*db;
-        if(error<closest){closest=error;best=i;}
+static int material_color(int block,int face,int shade_face,
+                          rd_u32 rgb,int x,int y) {
+    int r=(int)((rgb>>16)&255UL);
+    int g=(int)((rgb>>8)&255UL);
+    int b=(int)(rgb&255UL);
+    int lum=(r*3+g*4+b)/8;
+    int grain=bayer[((y&3)<<2)|(x&3)];
+    int shadow=shade_face>=4;
+    switch(block) {
+    case RD_GRASS:
+        /* The original side texture has a green lip and brown underside. */
+        if(face==FACE_TOP || (face==FACE_SIDE && g>r+12 && g>b+24))
+            return (!shadow && g>145 && grain>=13) ? 10:2;
+        return 6;
+    case RD_LEAVES:
+        return (!shadow && g>135 && grain>=12)?10:2;
+    case RD_DIRT: return 6;
+    case RD_STONE:
+    case RD_COBBLE:
+        return (!shadow && lum>120 && grain>=9)?7:8;
+    case RD_LOG:
+        return (!shadow && face!=FACE_SIDE && lum>120 && grain>=14)?14:6;
+    case RD_PLANKS:
+        return (!shadow && lum>140 && grain>=12)?14:6;
+    default:return 0;
     }
-    return best;
 }
 int main(int argc,char **argv){
     FILE *f;int block,face,x,y,v,texture,index;
@@ -48,7 +67,8 @@ int main(int argc,char **argv){
                     v=y*16+x;
                     if(block==RD_AIR)index=0;
                     else if(tex[block][texture][v]==TRANSPARENT)index=16;
-                    else index=nearest(shade_rgb(tex[block][texture][v],shade),x,y);
+                    else index=material_color(block,texture,face,
+                                shade_rgb(tex[block][texture][v],shade),x,y);
                     fprintf(f,"%d%s",index,v==255?"":",");
                 }
                 fprintf(f,"\n");

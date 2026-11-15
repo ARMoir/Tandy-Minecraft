@@ -83,12 +83,16 @@ static void paint_ground(rd_u8 *image,const rd_u8 *world,
         if(!cliff) {
             mat=world[((top-1)*RD_Z+bz)*RD_X+bx];
             face=1; /* original top texture */
+            /* Stable world-space texture mapping, without scrolling
+             * two full texels per screen row (which caused green/gray fuzz).
+             * Each surface cell has one coarse Tandy-readable texture.
+             */
             u=(fixedx>>4)&15;
-            v=((fixedz>>4)+(y-from)*2)&15;
+            v=((fixedz>>4)+(y-from)/3)&15;
         } else {
             face=(within<2)?1:(facing?0:2);
             u=coord&15;
-            v=(y*3+(worldy<<2))&15;
+            v=((worldy<<2)+(y-from)/2)&15;
         }
         if(mat==RD_AIR||mat>=RD_NUM_BLOCKS)continue;
         {rd_u8 pixel=rd_fast_texel(mat,face,(v<<4)|u);
@@ -108,8 +112,9 @@ static void paint_tree(rd_u8 *image,const rd_u8 *world,
         if(worldy<0||worldy>=RD_Y)continue;
         mat=world[(worldy*RD_Z+bz)*RD_X+bx];
         if(mat!=RD_LEAVES&&mat!=RD_LOG)continue;
-        u=((x>>4)+(y>>1))&15;
-        v=((z>>4)+(y*3))&15;
+        /* World-space foliage, not rapidly alternating cyan/grey noise. */
+        u=((x>>4)+(y-from)/4)&15;
+        v=((z>>4)+(y-from)/3)&15;
         face=mat==RD_LEAVES?1:2;
         pixel=rd_fast_texel(mat,face,(v<<4)|u);
         if(pixel!=16)image[(unsigned)y*(unsigned)width+(unsigned)col]=pixel;
@@ -132,9 +137,12 @@ void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
      */
     center=height/2+(int)(pitch*((float)height/2.0f));
     zoom=height==50?zoom50:(height==40?zoom40:zoom25);
-    /* Distinct blue sky and grassy ground below the true horizon. */
+    /* A clean palette: BLUE sky and GREEN earth. The previous blue/purple
+     * horizon stripe wasn't a Minecraft feature and looked like a glitch.
+     * Surface and trees are subsequently projected over these base colors.
+     */
     for(j=0;j<height;j++){
-        rd_u8 ink=j<center-2?11:(j<center?9:2);
+        rd_u8 ink=(rd_u8)(j<center?11:2);
         for(i=0;i<width;i++)image[(unsigned)j*width+(unsigned)i]=ink;
     }
     for(i=0;i<width;i++){

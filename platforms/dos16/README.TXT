@@ -120,3 +120,12 @@ Short taps are latched across slow frames, while holds are accumulated for
 camera rotation. Test-mode bars use correct odd/even Tandy video scanlines.
 Pitch changes are mapped to an explicitly visible horizon shift, while a
 tiny top-right yellow compass moves with yaw.
+
+VISUAL CLARITY FIX:
+- Offline texture conversion was accidentally changing original green grass
+  into gray EGA pixels. This made the whole landscape look like green and
+  gray visual noise. Material-aware palette mapping fixes green grass and
+  leaves, brown dirt and wood, gray stone while preserving texture grain.
+- Removed the purple-looking two-row horizon stripe.
+- Calmed down ground/leaf texture coordinates that varied wildly per row.
+- New automated palette and complete-screen image checks guard this.

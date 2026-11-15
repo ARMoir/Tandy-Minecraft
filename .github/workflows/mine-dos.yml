@@ -92,6 +92,14 @@ jobs:
           ./test-keys
           cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-camera tools/test_tandy_camera.c platforms/dos16/mine_keys.c src/rd.c src/rd_fast.c src/rd_terrain.c
           ./test-camera
+      - name: Validate material-faithful Tandy colors and terrain image
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-palette tools/test_tandy_palette.c
+          ./test-palette
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-visual tools/test_tandy_visual.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
+          ./test-visual
       - name: Upload DOS build
         uses: actions/upload-artifact@v4
         with:
