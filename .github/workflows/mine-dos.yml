@@ -132,6 +132,18 @@ jobs:
           ./face-preview
           python3 tools/preview_png.py
           test $(wc -c < MINE.PIC) -eq 32768
+      - name: Verify actual 16-bit executable under Tandy DOSBox
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y dosbox
+          printf '[sdl]\nfullscreen=false\n[dosbox]\nmachine=tandy\nmemsize=1\n[cpu]\ncore=normal\ncputype=8086\ncycles=fixed 20000\n[mixer]\nnosound=true\n' > tandy.conf
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 180s dosbox -conf tandy.conf -c 'mount c .' -c 'c:' -c 'mine /CAPTURE > CAPTURE.TXT' -c 'mine /MID /BENCH > MID.TXT' -c exit
+          cat CAPTURE.TXT MID.TXT
+          grep -q 'MINE 4 frames' MID.TXT
+          cmp HOST.RAW MINE.RAW
+          echo 'DOS framebuffer exactly matches host 320x200 preview'
       - name: Upload actual renderer previews
         uses: actions/upload-artifact@v4
         with:

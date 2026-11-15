@@ -22,6 +22,7 @@ int main(void) {
  int id,x,y,z;rd_u8 *w;
  rd_init(132211UL,RD_HILLS);id=rd_player_add();
  output("before.ppm",id,1);output("after.ppm",id,0);
+ {FILE *f=fopen("HOST.RAW","wb");if(!f)return 1;fwrite(pixels,1,64000,f);fclose(f);}
  {FILE *f=fopen("MINE.PIC","wb");
   for(y=0;y<200;y++)for(x=0;x<160;x++)
    pic[(y&3)*8192+(y/4)*160+x]=(rd_u8)((pixels[y*320+x*2]<<4)|pixels[y*320+x*2+1]);

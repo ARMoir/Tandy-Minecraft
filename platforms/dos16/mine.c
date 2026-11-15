@@ -19,7 +19,7 @@
 #define BENCH_FRAMES 4
 
 /* All arrays are under 64KB each for Open Watcom's large memory model. */
-static rd_u8 indexed[RENDER_MAX_W * RENDER_MAX_H];
+static rd_u8 indexed[64000UL];
 static rd_u8 packed[SCREEN_WIDTH_BYTES * RENDER_MAX_H];
 static int video_valid;
 static mine_keyboard keyboard;
@@ -153,7 +153,7 @@ static void save_world(void) {
 }
 
 int main(int argc,char **argv) {
-    int quality=1,auto_quality=0,auto_frames=0,bench=0,render_mode=3,keytest=0,player,frames=0,i,steps;
+    int quality=1,auto_quality=0,auto_frames=0,bench=0,render_mode=3,keytest=0,capture=0,player,frames=0,i,steps;
     int hud_action=RD_ACTION_NONE,hud_action_frames=0,hud_direction=MINE_DIR_NONE,hud_direction_frames=0;
     unsigned previous_mode,last_revision=0;
     int last_w=0,last_h=0,have_frame=0,last_hud=0;
@@ -163,6 +163,7 @@ int main(int argc,char **argv) {
     rd_input in;
     mine_commands commands;
     for(i=1;i<argc;i++) {
+        if(!strcmp(argv[i],"/CAPTURE")) {capture=1;bench=1;quality=3;auto_quality=0;}
         if(!strcmp(argv[i],"/ART") || !strcmp(argv[i],"/art")) return show_art();
         if(!strcmp(argv[i],"/MAX") || !strcmp(argv[i],"/max")) {quality=3;auto_quality=0;}
         if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) {quality=3;auto_quality=0;}
@@ -255,7 +256,7 @@ int main(int argc,char **argv) {
             float x,y,z,yaw,pitch;
             rd_player_pos(player,&x,&y,&z);
             rd_player_angles(player,&yaw,&pitch);
-            rd_player_set(player,x,y,z,yaw+0.12f,pitch);
+            if(!capture)rd_player_set(player,x,y,z,yaw+0.12f,pitch);
         } else {
             rd_player_input(player,&in);
             for(i=0;i<steps;i++) rd_tick();
@@ -299,6 +300,11 @@ int main(int argc,char **argv) {
         render_screen(w,h);
         video_ticks+=timer_ticks()-measured;
         frames++;
+        if(capture) {
+            FILE *f=fopen("MINE.RAW","wb");
+            if(f){fwrite(indexed,1,(unsigned)w*(unsigned)h,f);fclose(f);}
+            break;
+        }
         /* Default AUTO uses a hysteresis gap to avoid thrashing between
          * resolutions on the 18.2Hz BIOS clock. Never selects slow /HI.
          */
