@@ -137,14 +137,11 @@ void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
      */
     center=height/2+(int)(pitch*((float)height/2.0f));
     zoom=height==50?zoom50:(height==40?zoom40:zoom25);
-    /* A clean palette: BLUE sky and GREEN earth. The previous blue/purple
-     * horizon stripe wasn't a Minecraft feature and looked like a glitch.
-     * Surface and trees are subsequently projected over these base colors.
+    /* No fake ground! The world geometry must provide the land horizon.
+     * Previously half the screen was painted green even with NO blocks.
      */
-    for(j=0;j<height;j++){
-        rd_u8 ink=(rd_u8)(j<center?11:2);
-        for(i=0;i<width;i++)image[(unsigned)j*width+(unsigned)i]=ink;
-    }
+    for(j=0;j<height;j++)
+        for(i=0;i<width;i++)image[(unsigned)j*width+(unsigned)i]=11;
     for(i=0;i<width;i++){
         int angle=(2*i+1-width)*180/width;
         int vx=sn+(int)(((long)cs*angle)>>8);

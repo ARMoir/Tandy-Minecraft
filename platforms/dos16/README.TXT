@@ -129,3 +129,8 @@ VISUAL CLARITY FIX:
 - Removed the purple-looking two-row horizon stripe.
 - Calmed down ground/leaf texture coordinates that varied wildly per row.
 - New automated palette and complete-screen image checks guard this.
+
+GEOMETRY FIX: The sky is cleared entirely to BLUE. Green ground is
+drawn only where actual world terrain projects onto the screen, rather
+than painting a fake rectangular lower half even for an empty world.
+The Up/Down horizon test now uses real flat grass geometry.

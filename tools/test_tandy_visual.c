@@ -28,8 +28,31 @@ int main(void){
  world=rd_blocks();memset(world,RD_AIR,(unsigned)rd_world_bytes());
  rd_relight();rd_terrain_render(id,b,40,40);
  edited=change();
- if(edited<120){puts("Terrain does not reflect block edits");return 4;}
- printf("PASS: image sky=%d, green ground=%d, grey=%d, edits=%d\n",
+ if(edited<120){
+     fprintf(stderr,"Terrain edit check: only %d pixels changed\n",edited);
+     return 4;
+ }
+ /* Don't confuse the overlay elements with fake world geometry. */
+ for(i=0;i<1600;i++) {
+     int col=i%40,row=i/40;
+     int overlay=(col>=32&&row<=5)||
+                 (col>=17&&col<=23&&row>=17&&row<=23)||
+                 (col>=2&&col<=5&&row>=35);
+     if(!overlay&&b[i]!=11) {
+         fprintf(stderr,"Empty world not sky at x=%d y=%d color=%d\n",col,row,b[i]);
+         return 5;
+     }
+ }
+ printf("PASS: sky=%d, green ground=%d, grey=%d, world edit pixels=%d\n",
         sky,green,grey,edited);
+ for(i=0;i<40;i+=2) {
+     int x;
+     for(x=0;x<40;x++) {
+         int p=a[i*40+x];
+         putchar(p==11?' ':p==2?'g':p==10?'G':
+                 p==6?'d':p==7||p==8?'s':p==14?'Y':'.');
+     }
+     putchar('\n');
+ }
  return 0;
 }

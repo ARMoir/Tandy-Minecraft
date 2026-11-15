@@ -257,3 +257,10 @@ Ground coordinates are calmer and the spurious purple horizon stripe is
 removed. Automated tests validate palette identity and actual terrain pixel
 distribution as well as camera/physics behavior. No per-frame RGB work was
 added to the V20.
+
+### Real terrain horizon
+The fast renderer no longer paints fake grass below a fixed horizon; it
+clears to blue and uses real ground surfaces to establish the landscape
+silhouette. Empty world now renders as sky (plus HUD) and block edits
+visibly alter geometry. The world-image regression prints a coarse
+ASCII-map preview in Actions logs for a visual sanity check.

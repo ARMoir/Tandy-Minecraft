@@ -15,9 +15,7 @@ static rd_u8 image[W*H];
 static int horizon(int id){
     int y;
     rd_terrain_render(id,image,W,H);
-    /* Empty world renders deterministic sky=11, horizon=9, ground=2.
-     * Look for the first row that isn't blue at the left edge.
-     */
+    /* Projected flat-world silhouette: first non-sky pixel. */
     for(y=0;y<H;y++)if(image[y*W]!=11)return y;
     return H;
 }
@@ -34,8 +32,16 @@ int main(void){
     float x,y,z,yaw,pitch;
     rd_init(132211UL,RD_HILLS);
     id=rd_player_add();if(id<0)return 1;
-    /* Clear world to isolate the sky/ground horizon. */
-    memset(rd_blocks(),RD_AIR,(unsigned)rd_world_bytes());rd_relight();
+    /* The horizon now comes from actual flat grass geometry. */
+    {
+        int x,z,y;
+        rd_u8 *world=rd_blocks();
+        memset(world,RD_AIR,(unsigned)rd_world_bytes());
+        for(z=0;z<RD_Z;z++)for(x=0;x<RD_X;x++)
+            for(y=0;y<12;y++)
+                world[(y*RD_Z+z)*RD_X+x]=(rd_u8)(y==11?RD_GRASS:RD_DIRT);
+        rd_relight();
+    }
     rd_player_set(id,16.5f,12.0f,16.5f,0.0f,0.0f);
     base=horizon(id);
     tap(0x48,8,id);up=horizon(id);
