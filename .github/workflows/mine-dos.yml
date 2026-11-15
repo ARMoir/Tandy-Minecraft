@@ -140,8 +140,8 @@ jobs:
           set -euo pipefail
           # Compare identical benchmark cameras with the previous renderer/loop.
           git fetch --depth=1 origin ec623e2389fcae287a8f6e0c0627637067f1135c
-          git show 30ab90b2715e4cf5bfe6f800234463c899779c14:src/rd_faces.c > src/rd_faces_base.c
-          git show 30ab90b2715e4cf5bfe6f800234463c899779c14:platforms/dos16/mine.c > platforms/dos16/mine_base.c
+          git show ec623e2389fcae287a8f6e0c0627637067f1135c:src/rd_faces.c > src/rd_faces_base.c
+          git show ec623e2389fcae287a8f6e0c0627637067f1135c:platforms/dos16/mine.c > platforms/dos16/mine_base.c
           wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=BASE.EXE platforms/dos16/mine_base.c platforms/dos16/mine_keys.c platforms/dos16/mine_hud.c platforms/dos16/mine_map.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c src/rd_faces_base.c
           sudo apt-get update -qq
           sudo apt-get install -y dosbox
@@ -160,7 +160,7 @@ jobs:
           candidate,baseline=ticks('MID.TXT'),ticks('BASE.TXT')
           print(f"DOSBox benchmark: improved={candidate} ticks, build-28 baseline={baseline} ticks, speedup={baseline/candidate:.2f}x")
           if candidate>baseline:
-              raise SystemExit("Performance regression: new renderer slower than build 27")
+              raise SystemExit("Performance regression: new renderer slower than build 28")
           PY
           cmp HOST.RAW MINE.RAW
           echo 'DOS framebuffer exactly matches host 320x200 preview'
