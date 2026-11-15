@@ -61,9 +61,31 @@ static void render_screen(int w,int h) {
     int sy,x,r,repeat=320/w,lines=200/h;
     for(sy=0;sy<h;sy++) {
         unsigned input=(unsigned)sy*(unsigned)w;
-        for(x=0;x<160;x++) {
-            int x0=2*x/repeat,x1=(2*x+1)/repeat;
-            row[x]=(rd_u8)((indexed[input+x0]<<4)|indexed[input+x1]);
+        /* Build a packed line without DIV in the common modes.
+         * Previous code computed TWO 16-bit divisions for each of
+         * 160 bytes * every output row on every frame (V20 software
+         * frame rate is extremely sensitive to that overhead).
+         */
+        if(w==160) {
+            for(x=0;x<160;x++) {
+                rd_u8 c=indexed[input+(unsigned)x];
+                row[x]=(rd_u8)((c<<4)|c);
+            }
+        } else if(w==80) {
+            for(x=0;x<80;x++) {
+                rd_u8 c=indexed[input+(unsigned)x];
+                rd_u8 pair=(rd_u8)((c<<4)|c);
+                row[x*2]=pair;row[x*2+1]=pair;
+            }
+        } else if(w==320) {
+            for(x=0;x<160;x++)
+                row[x]=(rd_u8)((indexed[input+(unsigned)(2*x)]<<4)|
+                                indexed[input+(unsigned)(2*x+1)]);
+        } else {
+            for(x=0;x<160;x++) {
+                int x0=2*x/repeat,x1=(2*x+1)/repeat;
+                row[x]=(rd_u8)((indexed[input+x0]<<4)|indexed[input+x1]);
+            }
         }
         for(r=0;r<lines;r++) {
             unsigned y=(unsigned)(sy*lines+r),offset=y*160U;

@@ -26,6 +26,11 @@ static const short sintable[256]={
 };
 #define MAX_H 200
 #define RADIUS 32
+/* Distant microscopic faces cost more than their visual contribution.
+ * Preserve full-size, shaded, texture-mapped near cubes; MID draws 16
+ * blocks of geometry, LOW 11, MAX 28. The outside sky remains cyan.
+ */
+static int render_radius=16;
 typedef struct { int x,y,z,u,v; } vertex;
 typedef struct { int x,y,u,v; } screen_vertex;
 static int lx[MAX_H],rx[MAX_H];
@@ -120,7 +125,10 @@ static void face(vertex *a,int material,int shade) {
         if(p[i].y>hi)hi=p[i].y;
     }
     if(maxx<0||minx>=fw)return;
-    flat=(fw<=160&&((maxx-minx)<=4||(hi-lo)<=3));
+    /* Tiny faces show their original material color, not expensive
+     * 16x16 texel interpolation invisible on the physical CRT.
+     */
+    flat=(fw<=160&&((maxx-minx)<=9||(hi-lo)<=6));
     if(lo<0)lo=0;if(hi>=fh)hi=fh-1;
     if(lo>hi)return;
     for(y=lo;y<=hi;y++){lx[y]=32767;rx[y]=-32767;}
@@ -145,26 +153,39 @@ static void face(vertex *a,int material,int shade) {
             if(xx>rx[y]){rx[y]=xx;ru[y]=u;rv[y]=v;}
         }
     }
+    /* TEXEL SCAN: the original used two 32-bit signed divisions per
+     * horizontal scanline, then 32-bit u/v additions PER PIXEL.
+     * For a 16x16 atlas, 8.8 (0..4095) is entirely sufficient:
+     * two native 16-bit signed divisions per row and 16-bit increments.
+     * Preserve clipped near faces with long intermediate on left clipping.
+     */
     for(y=lo;y<=hi;y++) {
         int left=lx[y],right=rx[y],span;
-        long u,v,du,dv;unsigned offset;
+        int u,v,du,dv;unsigned offset;
         if(left>right||right<0||left>=fw)continue;
         if(flat) {
             if(left<0)left=0;if(right>=fw)right=fw-1;
-            memset(frame+(unsigned)y*(unsigned)fw+(unsigned)left,texture[136],right-left+1);
+            memset(frame+(unsigned)y*(unsigned)fw+(unsigned)left,texture[136],
+                   (unsigned)(right-left+1));
             continue;
         }
         span=right-left;
-        u=lu[y];v=lv[y];
-        du=span?(ru[y]-u)/span:0;dv=span?(rv[y]-v)/span:0;
-        if(left<0){u-=du*left;v-=dv*left;left=0;}
+        u=(int)(lu[y]>>8);
+        v=(int)(lv[y]>>8);
+        du=span?(int)((ru[y]-lu[y])>>8)/span:0;
+        dv=span?(int)((rv[y]-lv[y])>>8)/span:0;
+        if(left<0) {
+            u=(int)((long)u-(long)du*(long)left);
+            v=(int)((long)v-(long)dv*(long)left);
+            left=0;
+        }
         if(right>=fw)right=fw-1;
         offset=(unsigned)y*(unsigned)fw+(unsigned)left;
         for(j=left;j<=right;j++,u+=du,v+=dv) {
-            int tu=(int)(u>>16),tv=(int)(v>>16);
+            int tu=u>>8,tv=v>>8;
             if(tu<0)tu=0;if(tu>15)tu=15;
             if(tv<0)tv=0;if(tv>15)tv=15;
-            frame[offset++]=texture[tv*16+tu];
+            frame[offset++]=texture[(tv<<4)+tu];
         }
     }
 }
@@ -221,6 +242,7 @@ void rd_faces_render(int id,rd_u8 *image,int width,int height) {
     unsigned k,total;
     if(!image||width<8||width>320||height<8||height>MAX_H)return;
     frame=image;fw=width;fh=height;blocks=rd_blocks();
+    render_radius=width<=80?11:(width<=160?17:28);
     cache_faces();
     fx=width*5/7;fy=height*20/21; /* 4:3 CRT aspect, ~70 degree horizontal FOV */
     rd_player_pos(id,&x,&y,&z);rd_player_angles(id,&yaw,&pitch);
@@ -253,10 +275,10 @@ void rd_faces_render(int id,rd_u8 *image,int width,int height) {
             int bx=index%RD_X,bz=(index/RD_X)%RD_Z,by=index/(RD_X*RD_Z);
             int dx=bx-ex,dy=by-ey,dz=bz-ez;
             ring=(dx<0?-dx:dx)+(dy<0?-dy:dy)+(dz<0?-dz:dz);
-            if(ring>RADIUS)continue;
+            if(ring>render_radius)continue;
             next_surface[k]=heads[ring];heads[ring]=(unsigned short)k;
         }
-        for(ring=RADIUS;ring>=0;ring--) {
+        for(ring=render_radius;ring>=0;ring--) {
             unsigned node=heads[ring];
             while(node!=65535U) {
                 unsigned index=surface[node];
@@ -265,7 +287,7 @@ void rd_faces_render(int id,rd_u8 *image,int width,int height) {
             }
         }
     } else
-    for(ring=RADIUS;ring>=0;ring--)for(dx=-ring;dx<=ring;dx++) {
+    for(ring=render_radius;ring>=0;ring--)for(dx=-ring;dx<=ring;dx++) {
         int ax=dx<0?-dx:dx,remain=ring-ax;
         int bx=ex+dx;
         if(bx<0||bx>=RD_X)continue;

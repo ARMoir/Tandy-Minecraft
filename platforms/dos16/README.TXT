@@ -47,3 +47,12 @@ IBM/E0 arrows remain supported. Walking uses elapsed BIOS time, not four
 The renderer buckets exposed blocks, reuses shared transformed corners, and
 uses solid material shading only for tiny distant faces at LOW/MID/DETAIL.
 MAX retains full texturing. Physical V20 performance still requires testing.
+
+V20 PERFORMANCE PASS:
+- Native 16-bit texel stepping removes two software 32-bit divisions per
+  face scanline plus 32-bit pixel UV additions; large visible cube faces
+  retain the baked 16-color textures. Distant tiny faces use solid shade.
+- MID bounds 3-D geometry to 17 blocks; LOW to 11, MAX to 28.
+- 80/160/320-pixel frame packing eliminates pixel-index divisions and
+  reduces frame-to-screen work while preserving mode 09h output.
+- CI verifies real DOSBox benchmark and exact native-host framebuffer.
