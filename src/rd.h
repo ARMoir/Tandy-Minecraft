@@ -91,6 +91,14 @@ const rd_u8 *rd_light_depth(void);
 int rd_world_bytes(void);
 void rd_relight(void); /* call after writing into rd_blocks() directly */
 
+#ifdef RD_DOS16
+/* Action status: 0 none, 1 dug, 2 placed, 3 no target, 4 blocked.
+ * Updated only after core gameplay actually tests/mutates the world.
+ */
+enum { RD_ACTION_NONE, RD_ACTION_DUG, RD_ACTION_PLACED,
+       RD_ACTION_MISS, RD_ACTION_BLOCKED };
+int rd_take_action(int id); /* reads and clears latest gameplay result */
+#endif
 int rd_selected(int id);
 void rd_player_pos(int id, float *x, float *y, float *z);
 void rd_player_angles(int id, float *yaw, float *pitch);

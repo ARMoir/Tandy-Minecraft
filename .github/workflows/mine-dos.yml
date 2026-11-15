@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c platforms/dos16/mine_keys.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
+          wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c platforms/dos16/mine_keys.c platforms/dos16/mine_hud.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
           test -s MINE.EXE
           python3 - <<'PY'
           from pathlib import Path
@@ -106,6 +106,14 @@ jobs:
           set -euo pipefail
           cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-steps tools/test_terrain_steps.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
           ./test-steps
+      - name: Test actual DOS digging and placing plus visible feedback
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-actions tools/test_dos_actions.c src/rd.c
+          ./test-actions
+          cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-hud tools/test_tandy_hud.c platforms/dos16/mine_hud.c
+          ./test-hud
       - name: Upload DOS build
         uses: actions/upload-artifact@v4
         with:

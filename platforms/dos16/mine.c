@@ -10,6 +10,7 @@
 #include "../../src/rd.h"
 #include "../../src/rd_fast.h"
 #include "mine_keys.h"
+#include "mine_hud.h"
 
 #define SCREEN_WIDTH_BYTES 80
 #define RENDER_MAX_W 80
@@ -136,6 +137,7 @@ static void save_world(void) {
 
 int main(int argc,char **argv) {
     int quality=1,auto_quality=1,auto_frames=0,bench=0,render_mode=0,keytest=0,player,frames=0,i,steps;
+    int hud_action=RD_ACTION_NONE,hud_action_frames=0,hud_direction=MINE_DIR_NONE,hud_direction_frames=0;
     unsigned previous_mode;
     unsigned long began,last,now,elapsed,fps10,auto_since,setup_start,setup_ticks;
     unsigned long render_ticks=0,video_ticks=0,measured;
@@ -157,6 +159,7 @@ int main(int argc,char **argv) {
     printf("World: 32x24x32, video: Tandy 160x200 16 colors.\n");
     printf("WASD move, arrows LEFT/RIGHT turn UP/DOWN look, SPACE jump.\n");
     printf("F dig, E place, 1-7 blocks, R reset view, H detail, ESC/Q exit.\n");
+    printf("HUD: DIG/PUT=world changed; MISS=no target; BLOCK=can't place.\n");
     printf("ESC/Q quit, H detail, /MID 40x40, /DETAIL 40x50, /KEYTEST.\n");
     if(keytest) puts("KEYTEST rows: W A S D LEFT RIGHT UP DOWN. Green=held, pink=tapped.");
     setup_start=timer_ticks();
@@ -209,6 +212,20 @@ int main(int argc,char **argv) {
         mine_key_controls(&snapshot,elapsed,&in,&commands);
         if(commands.quit) break;
         if(commands.quality_cycle) {quality=(quality+1)%4;auto_quality=0;}
+        /* Report ALL arrow keys and WASD even if view changes are subtle.
+         * Give short presses time to remain visible at ~1 FPS.
+         */
+        if(in.pitch>0)hud_direction=MINE_DIR_UP;
+        else if(in.pitch<0)hud_direction=MINE_DIR_DOWN;
+        else if(in.yaw>0)hud_direction=MINE_DIR_RIGHT;
+        else if(in.yaw<0)hud_direction=MINE_DIR_LEFT;
+        else if(in.forward>0)hud_direction=MINE_DIR_W;
+        else if(in.forward<0)hud_direction=MINE_DIR_S;
+        else if(in.strafe>0)hud_direction=MINE_DIR_D;
+        else if(in.strafe<0)hud_direction=MINE_DIR_A;
+        else hud_direction=MINE_DIR_NONE;
+        if(hud_direction!=MINE_DIR_NONE)hud_direction_frames=3;
+        else if(hud_direction_frames>0)hud_direction_frames--;
         if(bench) {
             float x,y,z,yaw,pitch;
             rd_player_pos(player,&x,&y,&z);
@@ -222,6 +239,14 @@ int main(int argc,char **argv) {
         if(render_mode==2)rd_legacy_render(player,indexed,w,h);
         else if(render_mode==1)rd_fast_render(player,indexed,w,h);
         else rd_terrain_render(player,indexed,w,h);
+        /* Actual core mutation result, never merely a claimed key press. */
+        if(!bench) {
+            int result=rd_take_action(player);
+            if(result!=RD_ACTION_NONE){hud_action=result;hud_action_frames=8;}
+            else if(hud_action_frames>0)hud_action_frames--;
+            mine_hud_draw(indexed,w,h,hud_action,hud_action_frames,
+                          hud_direction,hud_direction_frames);
+        }
         render_ticks+=timer_ticks()-measured;
         measured=timer_ticks();
         render_screen(w,h);

@@ -272,3 +272,14 @@ keeps a small cap on the ledge. The initial DOS camera is tilted slightly
 downward for a more useful view of the terrain. A new host test constructs a
 one-block grassy stair-step and checks that the dirt face appears, and that
 flattening the land removes it.
+
+### Physical Tandy controls: visible, truthful feedback
+The DOS build now records actual core mutation outcomes and shows a colored
+status overlay: green `DIG` or `PUT` means a voxel was removed or placed;
+red `MISS` means no voxel was within reach; `BLOCK` means placement was
+invalid. Arrow and WASD input shows a yellow directional word, so actions
+remain observable even at very low FPS. The 2.5D fast renderer does not show
+every cave/side/underground edit; a successful mutation may be invisible in
+the landscape, hence the separate core-driven feedback. New tests construct
+a flat world, prove F and E actually change voxel counts, and verify that
+all three internal viewport sizes display the HUD without overflow.

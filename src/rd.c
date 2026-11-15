@@ -246,6 +246,9 @@ typedef struct {
     int selected;
     rd_input in;
     int has_target;
+#ifdef RD_DOS16
+    int action_result;
+#endif
     int tx, ty, tz, nx, ny, nz;
 } player;
 
@@ -300,6 +303,9 @@ int rd_player_add(void) {
             p->selected = RD_STONE;
             p->in = none;
             p->has_target = 0;
+#ifdef RD_DOS16
+            p->action_result = RD_ACTION_NONE;
+#endif
             respawn(p);
             return i;
         }
@@ -324,6 +330,15 @@ void rd_player_input(int id, const rd_input *in) {
     if (in->select) s->select = in->select;
 }
 
+#ifdef RD_DOS16
+int rd_take_action(int id) {
+    int result;
+    if(id<0||id>=RD_MAX_PLAYERS)return RD_ACTION_NONE;
+    result=players[id].action_result;
+    players[id].action_result=RD_ACTION_NONE;
+    return result;
+}
+#endif
 int rd_selected(int id) { return players[id].selected; }
 void rd_player_set(int id, float x, float y, float z, float yaw, float pitch) {
     player *p = &players[id];
@@ -553,17 +568,30 @@ static void tick_player(player *p) {
      * simulation tick. On V20 the terrain renderer doesn't display a
      * targeting outline, so only target when the user requests an edit.
      */
-    if (in->dig || in->place) update_target(p);
+    if (in->dig || in->place) {
+        p->action_result = RD_ACTION_MISS; /* default until a hit succeeds */
+        update_target(p);
+    }
 #else
     update_target(p);
 #endif
     if (p->has_target && in->dig) {
         set_block(p->tx, p->ty, p->tz, RD_AIR);
+#ifdef RD_DOS16
+        p->action_result = RD_ACTION_DUG;
+#endif
         update_target(p);
     } else if (p->has_target && in->place) {
         int x = p->tx + p->nx, y = p->ty + p->ny, z = p->tz + p->nz;
-        if (inside(x, y, z) && get(x, y, z) == RD_AIR && !box_hits_players(x, y, z))
+        if (inside(x, y, z) && get(x, y, z) == RD_AIR && !box_hits_players(x, y, z)) {
             set_block(x, y, z, p->selected);
+#ifdef RD_DOS16
+            p->action_result = RD_ACTION_PLACED;
+#endif
+        }
+#ifdef RD_DOS16
+        else p->action_result = RD_ACTION_BLOCKED;
+#endif
         update_target(p);
     }
     in->yaw = in->pitch = 0;

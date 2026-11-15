@@ -139,3 +139,15 @@ TERRAIN DEPTH: A one-block stair-step now renders a small brown dirt side
 below its grassy top. Previously only rises above one block showed sides,
 making the usual Minecraft hills look like flat green noise. Starting DOS
 camera looks down slightly more to show the actual landscape.
+
+ACTION FEEDBACK:
+  F dig   -> green DIG if actual voxel removed, red MISS if no block
+  E place -> green PUT if actual voxel added, red MISS if no target,
+             red BLOCK if occupied/outside/inside player
+  Arrows  -> yellow UP/DOWN/LEFT/RIGHT indicator, lasts for slow frames
+  WASD    -> yellow W/A/S/D movement indicator
+Indicators are shown over the normal 2.5D game picture for eight frames
+after an edit, including when the simplified terrain view cannot show a
+sideways/underground edit. They are driven by real gameplay results,
+not just whether a key was pressed. Lowered world editing is still voxel-
+based and /FULL displays more faces, but that view is significantly slower.
