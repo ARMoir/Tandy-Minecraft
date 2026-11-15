@@ -81,7 +81,10 @@ static int inside(int x, int y, int z) {
 }
 static int get(int x, int y, int z) { return inside(x, y, z) ? blocks[idx(x, y, z)] : RD_AIR; }
 
+static unsigned world_revision;
+unsigned rd_world_revision(void) { return world_revision; }
 static void relight_column(int x, int z) {
+    world_revision++;
     int y = RD_Y - 1;
     while (y >= 0 && blocks[idx(x, y, z)] == RD_AIR) y--;
     light_depth[x + z * RD_X] = (rd_u8)(y + 1);

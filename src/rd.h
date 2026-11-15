@@ -89,6 +89,7 @@ void rd_set_view_distance(int blocks); /* lower it on slow hardware */
 rd_u8 *rd_blocks(void);
 const rd_u8 *rd_light_depth(void);
 int rd_world_bytes(void);
+unsigned rd_world_revision(void);
 void rd_relight(void); /* call after writing into rd_blocks() directly */
 
 #ifdef RD_DOS16

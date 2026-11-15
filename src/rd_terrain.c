@@ -155,8 +155,8 @@ void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
         int clip=height,face_x=abs_int(vx)>abs_int(vz);
         for(depth=0;depth<TERRAIN_STEPS;depth++){
             unsigned dist=(unsigned)(256+depth*128);
-            int x=ox+(int)(((long)vx*dist)>>8);
-            int z=oz+(int)(((long)vz*dist)>>8);
+            int x=ox+(int)(((long)vx*(long)dist)>>8);
+            int z=oz+(int)(((long)vz*(long)dist)>>8);
             int bx,bz,top,ground,pyground,ptree;
             int blockheight=zoom[depth]>>8;
             int cliff;

@@ -38,11 +38,13 @@ jobs:
           cc -std=c99 -O2 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o atlasgen tools/make_tandy_atlas.c
           ./atlasgen src/rd_tandy_atlas.h
           test -s src/rd_tandy_atlas.h
+      - name: Bake native Tandy face artwork
+        run: python3 tools/make_face_art.py
       - name: Build true 8086-compatible 16-bit DOS executable
         shell: bash
         run: |
           set -euo pipefail
-          wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c platforms/dos16/mine_keys.c platforms/dos16/mine_hud.c platforms/dos16/mine_map.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c
+          wcl -bcl=dos -0 -ox -ml -zt256 -zastd=c99 -q -dRD_DOS16 -dRD_X=32 -dRD_Y=24 -dRD_Z=32 -dRD_MAX_PLAYERS=1 -fe=MINE.EXE platforms/dos16/mine.c platforms/dos16/mine_keys.c platforms/dos16/mine_hud.c platforms/dos16/mine_map.c src/rd.c src/rd_fast.c src/rd_terrain.c src/rd_legacy.c src/rd_faces.c
           test -s MINE.EXE
           python3 - <<'PY'
           from pathlib import Path
@@ -120,6 +122,26 @@ jobs:
           set -euo pipefail
           cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-map tools/test_tandy_map.c platforms/dos16/mine_map.c src/rd.c
           ./test-map
+      - name: Test block faces and bake full-resolution Tandy scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o test-faces tools/test_faces.c src/rd.c src/rd_faces.c
+          ./test-faces
+          cc -std=c99 -O2 -DRD_DOS16 -DRD_X=32 -DRD_Y=24 -DRD_Z=32 -DRD_MAX_PLAYERS=1 -o face-preview tools/face_preview.c src/rd.c src/rd_faces.c src/rd_fast.c src/rd_terrain.c
+          ./face-preview
+          python3 tools/preview_png.py
+          test $(wc -c < MINE.PIC) -eq 32768
+      - name: Upload actual renderer previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: tandy-visual-previews
+          path: |
+            *-native.png
+            before.png
+            after.png
+            blocks.png
+            doorway.png
       - name: Upload DOS build
         uses: actions/upload-artifact@v4
         with:
@@ -127,6 +149,7 @@ jobs:
           if-no-files-found: error
           path: |
             MINE.EXE
+            MINE.PIC
             platforms/dos16/README.TXT
             LICENSE
 
@@ -150,9 +173,10 @@ jobs:
           test -s platforms/dos16/README.TXT
           mkdir -p release
           cp MINE.EXE release/MINE.EXE
+          cp MINE.PIC release/MINE.PIC
           cp LICENSE release/LICENSE
           cp platforms/dos16/README.TXT release/README.TXT
-          (cd release && zip -q -9 MINE-DOS.zip MINE.EXE README.TXT LICENSE)
+          (cd release && zip -q -9 MINE-DOS.zip MINE.EXE MINE.PIC README.TXT LICENSE)
           unzip -t release/MINE-DOS.zip
       - name: Publish release and delete all earlier releases/tags
         shell: bash
