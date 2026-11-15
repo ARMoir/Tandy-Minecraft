@@ -319,12 +319,17 @@ static void draw_cell(int bx,int by,int bz,int ex,int ey,int ez) {
                 if(by<ey&&(mask&16))quad(bx,by,bz,1,1,mat);
                 if(by>ey&&(mask&32))quad(bx,by,bz,1,0,mat);
 }
-void rd_faces_render(int id,rd_u8 *image,int width,int height) {
+static void faces_scene(int id,rd_u8 *image,int width,int height,int near_only) {
     float x,y,z,yaw,pitch;int ex,ey,ez,phase,ring,dx,dy,dz,sign;
     unsigned k,total;
     if(!image||width<8||width>320||height<8||height>MAX_H)return;
     frame=image;fw=width;fh=height;blocks=rd_blocks();
-    render_radius=width<=80?11:(width<=160?17:28);
+    /* Hybrid mode renders only the first few block shells in real 3D.
+     * The far scene is provided by the cached heightfield approximation.
+     * Full /FACES retains the prior radius and the original scene.
+     */
+    render_radius=near_only?(width<=80?(height<=50?6:8):10):
+                             (width<=80?11:(width<=160?17:28));
     cache_faces();
     fx=width*5/7;fy=height*20/21; /* 4:3 CRT aspect, ~70 degree horizontal FOV */
     rd_player_pos(id,&x,&y,&z);rd_player_angles(id,&yaw,&pitch);
@@ -344,11 +349,11 @@ void rd_faces_render(int id,rd_u8 *image,int width,int height) {
         vertical_y[k]=(long)dy*cp;vertical_z[k]=(long)dy*sp;
     }
     total=(unsigned)width*(unsigned)height;
-    for(k=0;k<total;k++)image[k]=11;
+    if(!near_only)for(k=0;k<total;k++)image[k]=11;
     /* Each ray moves monotonically away from the eye in each grid axis.
      * Therefore Manhattan shells give a valid painter order without sorting.
      * Radius is deliberately bounded for an 8088/V20. */
-    if(!surface_overflow) {
+    if(!near_only&&!surface_overflow) {
         /* Bucket only exposed cells instead of scanning the entire volume.
          * Distance ties cannot occlude each other except shared edge pixels. */
         for(ring=0;ring<=RADIUS;ring++)heads[ring]=65535U;
@@ -389,4 +394,13 @@ void rd_faces_render(int id,rd_u8 *image,int width,int height) {
          image[(unsigned)(yy+i)*width+cx]=0;
      }
      image[(unsigned)yy*width+cx]=15;}
+}
+
+/* Build #30 full-distance face renderer, available through /FACES. */
+void rd_faces_render(int id,rd_u8 *image,int w,int h) {
+    faces_scene(id,image,w,h,0);
+}
+/* No sky clear. Draw shaded textured close voxels over far background. */
+void rd_faces_render_near(int id,rd_u8 *image,int w,int h) {
+    faces_scene(id,image,w,h,1);
 }

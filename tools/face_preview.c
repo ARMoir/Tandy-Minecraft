@@ -22,6 +22,19 @@ int main(void) {
  int id,x,y,z;rd_u8 *w;
  rd_init(132211UL,RD_HILLS);id=rd_player_add();
  output("before.ppm",id,1);output("after.ppm",id,0);
+ /* The hybrid preview uses actual live rendering, not a made-up picture. */
+ {FILE *f=fopen("hybrid.ppm","wb");unsigned k;
+  if(!f)return 1;
+  rd_hybrid_render(id,pixels,80,50);
+  fprintf(f,"P6\n320 200\n255\n");
+  for(k=0;k<64000U;k++) {
+      unsigned x=(k%320U)/4U,y=(k/320U)/4U;
+      fwrite(rgb[pixels[y*80U+x]&15],1,3,f);
+  }
+  fclose(f);
+ }
+ /* Restore the 320x200 original for DOS and host framebuffer comparison. */
+ rd_faces_render(id,pixels,320,200);
  {FILE *f=fopen("HOST.RAW","wb");if(!f)return 1;fwrite(pixels,1,64000,f);fclose(f);}
  {FILE *f=fopen("MINE.PIC","wb");
   for(y=0;y<200;y++)for(x=0;x<160;x++)

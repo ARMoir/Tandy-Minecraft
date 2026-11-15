@@ -225,3 +225,17 @@ distance is bounded; the finite world's edge remains visible. Existing
 
 Builds run from main. The existing release workflow publishes the new ZIP
 after checks pass, then removes older releases and tags.
+
+
+### Hybrid V20 renderer — 2 FPS hardware experiment
+The default DOS engine uses **nearby genuine textured voxel cube faces**
+over a **cached 40×25 distant scenery layer**. Instead of processing the
+thousands of exposed cubes in Build #30, the near pass traverses only a
+handful of Manhattan shells. Distant scenery is recomputed only when the
+camera crosses a small position/angle threshold or the world changes.
+Rendering and palette formats remain 16-color Tandy-native. Start with
+`MINE /LOW` (80×50 internal) or `MINE /MID` (80×100). Use `MINE /FACES`
+to compare the unmodified full-distance Build #30 renderer. The original
+voxel world, keyboard handling, mining/placing, and saves remain intact.
+The pass/fail target is **2 FPS on the physical 7 MHz V20**; DOSBox numbers
+are only an automated relative-performance sanity check.

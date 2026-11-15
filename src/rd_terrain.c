@@ -125,7 +125,7 @@ static void paint_tree(rd_u8 *image,const rd_u8 *world,
         if(pixel!=16)image[(unsigned)y*(unsigned)width+(unsigned)col]=pixel;
     }
 }
-void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
+static void terrain_core(int id,rd_u8 *image,int width,int height,int far_only) {
     float px,py,pz,yaw,pitch;
     const rd_u8 *world=rd_blocks(),*tops=rd_light_depth();
     const unsigned short *zoom;
@@ -153,7 +153,7 @@ void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
         int vz=cs-(int)(((long)sn*angle)>>8);
         int prevx=-1,prevz=-1,prevground=-1;
         int clip=height,face_x=abs_int(vx)>abs_int(vz);
-        for(depth=0;depth<TERRAIN_STEPS;depth++){
+        for(depth=far_only?9:0;depth<TERRAIN_STEPS;depth++){
             unsigned dist=(unsigned)(256+depth*128);
             int x=ox+(int)(((long)vx*(long)dist)>>8);
             int z=oz+(int)(((long)vz*(long)dist)>>8);
@@ -189,6 +189,8 @@ void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
             if(clip==0)break;
         }
     }
+    /* The hybrid backdrop must contain terrain only, no HUD. */
+    if(!far_only){
     /* Tiny top-right compass: yellow dot moves as Left/Right changes yaw.
      * This makes camera rotation obvious even when facing empty sky.
      */
@@ -220,4 +222,12 @@ void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
             for(i=2;i<5;i++)
                 image[(unsigned)j*width+(unsigned)i]=(i==2||i==4||j==height-3)?0:ink;
     }
+    }
+}
+
+void rd_terrain_render(int id,rd_u8 *image,int width,int height) {
+    terrain_core(id,image,width,height,0);
+}
+void rd_terrain_render_far(int id,rd_u8 *image,int width,int height) {
+    terrain_core(id,image,width,height,1);
 }

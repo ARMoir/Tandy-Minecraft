@@ -1,66 +1,45 @@
-MINE - Tandy 1000 EX / NEC V20 / 16-bit DOS
+MINE.EXE - TANDY 1000 EX / V20 / 16-BIT DOS
+==============================================
+Experimental HYBRID renderer (2 FPS real-hardware target).
+Video mode 09h: 320x200, 16 colors. Native 8086 machine code.
 
-VISUAL RESCUE BUILD
-Video: native Tandy BIOS mode 09h, 320x200, 16 colors.
-Default: textured voxel faces at 160x100, enlarged 2x2 for the screen.
-Unlike the old heightfield, this draws real block sides, openings and undersides.
+DEFAULT    Hybrid: original shaded/textured cubes nearby; compact scenery
+           farther away. Uses internal 80x50 pixels for speed.
+ /LOW      Hybrid 80x50 (fastest 3D cubes)
+ /MID      Hybrid 80x100 (sharper vertical definition)
+ /DETAIL   Hybrid 160x100 (slower)
+ /MAX      Hybrid 160x200 (significantly slower)
+ /HYBRID   Explicitly choose the hybrid renderer
+ /FACES    Preserve Build #30 full-radius detailed face rendering
+ /TERRAIN  Earlier 2.5D landscape (does not show nearby cube faces)
+ /FULL     Older full 3D voxel DDA renderer
+ /OLD      First integer ray marcher
+ /AUTO     Auto-select MID/LOW when frame times rise
+ /BENCH    Four rotating frames, then DOS timing stats. No save.
+ /ART      Display pre-generated high-res scene from MINE.PIC; press key.
+ /KEYTEST  Independent keyboard test
+ /CAPTURE  Full-face renderer comparison; writes MINE.RAW
 
-MINE /ART     Show pre-generated 320x200 scene; press a key to exit.
-              Requires MINE.PIC from this ZIP. Does not load/save your world.
-MINE /MAX     Live 320x200 rendering. Highest detail; speed unverified on V20.
-MINE /HI      Alias for /MAX.
-MINE /DETAIL  Live 160x200 rendering.
-MINE /MID     Live 160x100 rendering (default).
-MINE /LOW     Live 80x100 rendering.
-MINE /AUTO    Explicit adaptive quality; may switch MID to LOW.
-MINE /BENCH   Four camera frames; reports setup/render/video timing; no save.
-MINE /KEYTEST Independent keyboard diagnostic; Escape exits.
-MINE /TERRAIN Old fast heightfield for comparison.
-MINE /FULL    Old per-pixel DDA renderer for comparison.
-MINE /OLD     Original integer ray marcher for comparison.
+WASD forward/back/strafe; arrows rotate/look; SPACE jump; F dig, E place,
+1-7 select block; R respawn; H cycle detail; ESC/Q save and exit.
+MINE.WLD loads automatically when present and is saved at normal exit.
+The minimap and DIG/PUT/MISS/BLOCK feedback remain available.
 
-WASD move; arrows turn/look; Space jump; F dig; E place; 1-7 select block;
-R reset view; H cycle detail; Escape/Q save MINE.WLD and exit.
-DIG/PUT confirm actual edits. MISS/BLOCK mean no edit occurred.
+HYBRID ARCHITECTURE:
+1. 40x25 coarse distant terrain using original 16-color textures,
+   cached until quantized camera orientation or position/world changes.
+2. A small number of Manhattan shells of true textured, clipped 3D
+   blocks are drawn over that scene. Near edits/holes stay voxel-accurate.
+3. Video writes are skipped for scanlines identical to the last frame.
+4. World logic, collisions and save format are unchanged.
+5. /FACES selects the previous full-face renderer for visual comparison.
 
-Artwork is baked on the build host into 24 small 16-color face textures.
-MINE.PIC is a real render of the default world, stored in four-bank video
-layout (32768 bytes). It is a static preview, not a gameplay or FPS demo.
-The live renderer uses integer transforms, near-plane clipping, exposed-face
-caching, back-to-front voxel ordering, and packed changed-row video copies.
-Still views are not repeatedly rendered. Block edits invalidate the face cache.
+LIMITATIONS:
+- Distant foliage/hills are approximate; caves and overhangs are true 3D
+  only nearby. Quantized far scenery can step during fast turning.
+- Blocky 80x50 is intentional, not equivalent to full 320x200 artwork.
+- 2 FPS HAS NOT been confirmed on a real 7 MHz V20.
+- This is a measured experiment, not a production-ready Minecraft port.
 
-LIMITS: 32x24x32 world; bounded draw radius; affine texture mapping; leaf
-blocks are opaque cubes. The world edge is visible. No real V20 frame-rate
-claim is made until tested on hardware. Try /MID /BENCH before /MAX /BENCH.
-Existing MINE.WLD is preserved. /ART and /BENCH never save it.
-
-Inspired by WolfensteinCGA's offline art conversion, lookup tables, packed
-bulk video writes and timedemo approach. Its wall scalers were not copied:
-Minecraft has variable-height blocks, holes, pitch and changing geometry.
-https://github.com/jhhoward/WolfensteinCGA
-
-INPUT AND SPEED CORRECTION
-Native EX/HX arrows (29/2B/4A/4E) are normalized before the IRQ latch.
-IBM/E0 arrows remain supported. Walking uses elapsed BIOS time, not four
-60Hz ticks per rendered frame. Swept collisions still prevent wall tunneling.
-The renderer buckets exposed blocks, reuses shared transformed corners, and
-uses solid material shading only for tiny distant faces at LOW/MID/DETAIL.
-MAX retains full texturing. Physical V20 performance still requires testing.
-
-V20 PERFORMANCE PASS:
-- Native 16-bit texel stepping removes two software 32-bit divisions per
-  face scanline plus 32-bit pixel UV additions; large visible cube faces
-  retain the baked 16-color textures. Distant tiny faces use solid shade.
-- MID bounds 3-D geometry to 17 blocks; LOW to 11, MAX to 28.
-- 80/160/320-pixel frame packing eliminates pixel-index divisions and
-  reduces frame-to-screen work while preserving mode 09h output.
-- CI verifies real DOSBox benchmark and exact native-host framebuffer.
-
-FURTHER V20 SPEED WORK:
-- Precomputed inverse-depth lookup for distant projected cube vertices,
-  avoiding two 32-bit divides per projected 3D corner; nearby faces stay
-  exact to retain sharp close blocks.
-- Replaced UV-edge 32-bit divisions with native 16-bit divisions; texel
-  grid remains 16x16, and both DOS and host share the same math.
-- CI compares four frames against the previously verified Build #28.
+Recommended test: MINE /LOW /BENCH, then MINE /MID /BENCH,
+followed by MINE /LOW for gameplay responsiveness.

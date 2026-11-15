@@ -175,7 +175,7 @@ static void save_world(void) {
 }
 
 int main(int argc,char **argv) {
-    int quality=1,auto_quality=0,auto_frames=0,bench=0,render_mode=3,keytest=0,capture=0,player,frames=0,i,steps;
+    int quality=0,auto_quality=0,auto_frames=0,bench=0,render_mode=4,keytest=0,capture=0,player,frames=0,i,steps;
     int hud_action=RD_ACTION_NONE,hud_action_frames=0,hud_direction=MINE_DIR_NONE,hud_direction_frames=0;
     unsigned previous_mode,last_revision=0;
     int last_w=0,last_h=0,have_frame=0,last_hud=0;
@@ -185,7 +185,7 @@ int main(int argc,char **argv) {
     rd_input in;
     mine_commands commands;
     for(i=1;i<argc;i++) {
-        if(!strcmp(argv[i],"/CAPTURE")) {capture=1;bench=1;quality=3;auto_quality=0;}
+        if(!strcmp(argv[i],"/CAPTURE")) {capture=1;bench=1;quality=3;auto_quality=0;render_mode=3;}
         if(!strcmp(argv[i],"/ART") || !strcmp(argv[i],"/art")) return show_art();
         if(!strcmp(argv[i],"/MAX") || !strcmp(argv[i],"/max")) {quality=3;auto_quality=0;}
         if(!strcmp(argv[i],"/HI") || !strcmp(argv[i],"/hi")) {quality=3;auto_quality=0;}
@@ -196,6 +196,8 @@ int main(int argc,char **argv) {
         if(!strcmp(argv[i],"/AUTO") || !strcmp(argv[i],"/auto")) {quality=1;auto_quality=1;}
         if(!strcmp(argv[i],"/BENCH") || !strcmp(argv[i],"/bench")) bench=1;
         if(!strcmp(argv[i],"/OLD") || !strcmp(argv[i],"/old")) render_mode=2;
+        if(!strcmp(argv[i],"/FACES") || !strcmp(argv[i],"/faces")) render_mode=3;
+        if(!strcmp(argv[i],"/HYBRID") || !strcmp(argv[i],"/hybrid")) render_mode=4;
         if(!strcmp(argv[i],"/FULL") || !strcmp(argv[i],"/full")) render_mode=1;
         if(!strcmp(argv[i],"/TERRAIN") || !strcmp(argv[i],"/terrain")) render_mode=0;
     }
@@ -205,7 +207,8 @@ int main(int argc,char **argv) {
     printf("F dig, E place, 1-7 blocks, R reset view, H detail, ESC/Q exit.\n");
     printf("HUD: DIG/PUT=world changed; MISS=no target; BLOCK=can't place.\n");
     printf("Map: bottom-right, white=you, yellow=facing; /LOW hides map.\n");
-    printf("ESC/Q quit, H detail, /MID 160x100, /MAX 320x200, /ART prebuilt scene.\n");
+    printf("Default HYBRID: textured cubes near, cached far scenery.\n");
+    printf("/LOW 80x50; /MID 80x100; /FACES original full-3D; /ART picture.\n");
     if(keytest) puts("KEYTEST rows: W A S D LEFT RIGHT UP DOWN. Green=held, pink=tapped.");
     setup_start=timer_ticks();
     puts("Loading embedded Minecraft world...");
@@ -241,10 +244,12 @@ int main(int argc,char **argv) {
     began=last=auto_since=timer_ticks();
     while(!keyboard.down[0x01] && !keyboard.down[0x10] &&
           !keyboard.edge[0x01] && !keyboard.edge[0x10]) {
-        int w=render_mode==3?(quality==3?320:(quality==0?80:160)):
-                              (quality==3?80:(quality==0?20:40));
-        int h=render_mode==3?(quality>=2?200:100):
-                              (quality==0?25:(quality==1?40:50));
+        int w=(render_mode==3)?(quality==3?320:(quality==0?80:160)):
+              (render_mode==4)?(quality>=2?160:80):
+                               (quality==3?80:(quality==0?20:40));
+        int h=(render_mode==3)?(quality>=2?200:100):
+              (render_mode==4)?(quality==0?50:(quality==3?200:100)):
+                               (quality==0?25:(quality==1?40:50));
         now=timer_ticks();
         elapsed=now-last;
         if(!elapsed&&have_frame&&!bench)continue;
@@ -303,7 +308,8 @@ int main(int argc,char **argv) {
         if(render_mode==2)rd_legacy_render(player,indexed,w,h);
         else if(render_mode==1)rd_fast_render(player,indexed,w,h);
         else if(render_mode==0)rd_terrain_render(player,indexed,w,h);
-        else rd_faces_render(player,indexed,w,h);
+        else if(render_mode==3)rd_faces_render(player,indexed,w,h);
+        else rd_hybrid_render(player,indexed,w,h);
         /* Actual core mutation result, never merely a claimed key press. */
         if(!bench) {
             int result=rd_take_action(player);
